@@ -63,12 +63,12 @@ class _LoginPageState extends State<LoginPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.lock_person_rounded, size: 80, color: Colors.deepPurple),
+            Image.asset("assets/icon.png", height: 100),
             const SizedBox(height: 32),
             const Text(
-              "Voz Segura",
+              "Seja bem-vinda!",
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.deepPurple),
+              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black),
             ),
             const SizedBox(height: 48),
             TextField(
@@ -94,7 +94,7 @@ class _LoginPageState extends State<LoginPage> {
               onPressed: _isLoading ? null : _onLogin,
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.all(16),
-                backgroundColor: Colors.deepPurple,
+                backgroundColor: const Color(0xFF815A68),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
