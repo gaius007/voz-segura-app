@@ -43,3 +43,18 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Additional Flutter/Dart ignores
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec_overrides.yaml
+
+# Generated code - keep if you want it in git, ignore if you generate on CI
+# *.g.dart
+# *.freezed.dart
+
+# IDEs
+.vscode/
+.idea/
+*.iml

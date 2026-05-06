@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'login_page.dart';
-import 'register_page.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'src/core/theme/app_theme.dart';
+import 'src/features/auth/presentation/login_page.dart';
+import 'src/features/auth/presentation/register_page.dart';
+import 'src/features/contacts/presentation/emergency_contacts_page.dart';
+import 'src/features/sos/presentation/home_page.dart';
 
-// Configurações do projeto Firebase (obtidas do Console do Firebase)
+// Configurações do projeto Firebase
 const firebaseConfig = FirebaseOptions(
   apiKey: "AIzaSyAv46EF0QnhCbF83aRuvSzmezfUikmPToU",
   authDomain: "voz-segura---database.firebaseapp.com",
@@ -15,13 +19,14 @@ const firebaseConfig = FirebaseOptions(
 );
 
 void main() async {
-  // Garante que o Flutter esteja inicializado antes de rodar o Firebase
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Conecta o aplicativo ao Firebase com as configurações acima
   await Firebase.initializeApp(options: firebaseConfig);
   
-  runApp(const MainApp());
+  runApp(
+    const ProviderScope(
+      child: MainApp(),
+    ),
+  );
 }
 
 class MainApp extends StatelessWidget {
@@ -32,41 +37,14 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Voz Segura',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      // Define a rota que abrirá primeiro ao iniciar o app
+      theme: AppTheme.lightTheme,
       initialRoute: '/login',
-      
-      // Mapeamento das telas do aplicativo
       routes: {
-        '/login': (context) => const LoginPage(),       // Tela de Login
-        '/registro': (context) => const RegisterPage(), // Tela de Cadastro
-        '/home': (context) => const HomePage(),         // Tela Principal (pós-login)
+        '/login': (context) => const LoginPage(),
+        '/registro': (context) => const RegisterPage(),
+        '/contacts': (context) => const EmergencyContactsPage(),
+        '/home': (context) => const HomePage(),
       },
-    );
-  }
-}
-
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Início"),
-        actions: [
-          IconButton(
-            onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
-            icon: const Icon(Icons.logout),
-          )
-        ],
-      ),
-      body: const Center(
-        child: Text("Bem-vindo ao Voz Segura!"),
-      ),
     );
   }
 }
