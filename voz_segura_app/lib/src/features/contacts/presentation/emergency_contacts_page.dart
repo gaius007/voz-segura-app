@@ -1,11 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/contact_repository.dart';
 import '../domain/contact.dart';
 
-// Tela pra gerenciar a rede de apoio (os contatos de emergencia)
 class EmergencyContactsPage extends StatefulWidget {
   const EmergencyContactsPage({super.key});
 
@@ -18,8 +18,20 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
   final _nameController = TextEditingController();
   final _valueController = TextEditingController();
   String _selectedType = 'WhatsApp';
+  bool _salvando = false; // Novo: pra mostrar loading no modal
 
-  // Modal pra adicionar ou editar contato
+  final _maskCelular = MaskTextInputFormatter(
+    mask: '(##) #####-####',
+    filter: {"#": RegExp(r'[0-9]')},
+  );
+
+  List<MaskTextInputFormatter> _getMask() {
+    if (_selectedType == 'WhatsApp' || _selectedType == 'Telefone') {
+      return [_maskCelular];
+    }
+    return [];
+  }
+
   void _showModal({Contact? contact}) {
     if (contact != null) {
       _nameController.text = contact.name;
@@ -35,53 +47,74 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-          ),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  contact == null ? "Novo Contato" : "Editar Contato",
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFFF4081)),
-                ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: _nameController,
-                  decoration: const InputDecoration(labelText: "Nome", border: OutlineInputBorder()),
-                  validator: (v) => v!.isEmpty ? "Nao esquece do nome!" : null,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: _selectedType,
-                  items: ['WhatsApp', 'Telefone', 'E-mail'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                  onChanged: (v) => setState(() => _selectedType = v!),
-                  decoration: const InputDecoration(labelText: "Tipo de Contato", border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _valueController,
-                  decoration: const InputDecoration(labelText: "Numero ou Link", border: OutlineInputBorder()),
-                  validator: (v) => v!.isEmpty ? "Precisa colocar o contato!" : null,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () => _save(contact?.id),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFF4081),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(double.infinity, 50),
+      builder: (context) => StatefulBuilder( // StatefulBuilder pra atualizar o loading dentro do modal
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            ),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    contact == null ? "Novo Contato" : "Editar Contato",
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFFFF4081)),
                   ),
-                  child: const Text("SALVAR CONTATO"),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  TextFormField(
+                    controller: _nameController,
+                    enabled: !_salvando,
+                    decoration: const InputDecoration(labelText: "Nome", border: OutlineInputBorder()),
+                    validator: (v) => v!.isEmpty ? "Nao esquece do nome!" : null,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _selectedType,
+                    items: ['WhatsApp', 'Telefone', 'E-mail'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                    onChanged: _salvando ? null : (v) {
+                      setModalState(() {
+                        _selectedType = v!;
+                        _valueController.clear();
+                      });
+                    },
+                    decoration: const InputDecoration(labelText: "Tipo de Contato", border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _valueController,
+                    enabled: !_salvando,
+                    inputFormatters: _getMask(),
+                    keyboardType: _selectedType == 'E-mail' ? TextInputType.emailAddress : TextInputType.phone,
+                    decoration: InputDecoration(
+                      labelText: _selectedType == 'E-mail' ? "E-mail" : "Número",
+                      border: const OutlineInputBorder(),
+                      hintText: _selectedType == 'E-mail' ? "exemplo@email.com" : "(00) 00000-0000",
+                    ),
+                    validator: (v) => v!.isEmpty ? "Precisa colocar o contato!" : null,
+                  ),
+                  const SizedBox(height: 24),
+                  _salvando 
+                    ? const CircularProgressIndicator()
+                    : ElevatedButton(
+                        onPressed: () async {
+                          setModalState(() => _salvando = true);
+                          await _save(contact?.id);
+                          if (mounted) setModalState(() => _salvando = false);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFFF4081),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 50),
+                        ),
+                        child: const Text("SALVAR CONTATO"),
+                      ),
+                ],
+              ),
             ),
           ),
         ),
@@ -89,27 +122,34 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
     );
   }
 
-  // Salva no Firestore do Firebase
   Future<void> _save(String? id) async {
     if (!_formKey.currentState!.validate()) return;
     
     final user = context.read<AuthRepository>().currentUser;
     if (user == null) return;
 
-    final contact = Contact(
-      id: id,
-      name: _nameController.text,
-      type: _selectedType,
-      value: _valueController.text,
-    );
+    try {
+      final contact = Contact(
+        id: id,
+        name: _nameController.text,
+        type: _selectedType,
+        value: _valueController.text,
+      );
 
-    if (id == null) {
-      await context.read<ContactRepository>().addContact(user.uid, contact);
-    } else {
-      await context.read<ContactRepository>().updateContact(user.uid, contact);
+      if (id == null) {
+        await context.read<ContactRepository>().addContact(user.uid, contact);
+      } else {
+        await context.read<ContactRepository>().updateContact(user.uid, contact);
+      }
+
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao salvar contato: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
-
-    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -131,7 +171,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
             colors: [Colors.white, Colors.pink.shade50],
           ),
         ),
-        child: Center( // Deixando responsivo pra web
+        child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 700),
             child: user == null

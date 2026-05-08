@@ -1,11 +1,12 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart'; // Importei pra usar o kIsWeb
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../manager/report_notifier.dart';
+// Removi o dart:io direto pra nao dar erro no navegador
+// O professor disse que eh melhor usar o kIsWeb pra separar as coisas
+import 'dart:io' as io; 
 
-// Tela pra criar um novo relato. Tentei deixar o mais bonito possivel!
 class ReportCreatePage extends StatefulWidget {
   const ReportCreatePage({super.key});
 
@@ -19,9 +20,14 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
   final ImagePicker _picker = ImagePicker();
   bool _enviando = false;
 
-  // Funcao pra abrir a camera e tirar a foto da prova
   Future<void> _abrirCamera() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.camera);
+    // Diminui o tamanho da foto pra caber no Firestore (Plano B do professor)
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.camera,
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 70, // Qualidade 70% ja ta otimo e fica leve
+    );
     if (image != null) {
       setState(() {
         _fotosLocais.add(image.path);
@@ -29,7 +35,6 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
     }
   }
 
-  // Aqui a gente manda tudo pro Firebase
   Future<void> _salvarNoFirebase() async {
     final texto = _descController.text;
     if (texto.isEmpty) {
@@ -41,7 +46,6 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
 
     setState(() => _enviando = true);
     try {
-      // O Notifier cuida de subir as fotos pro Storage e o texto pro Firestore
       await context.read<ReportNotifier>().adicionarRelato(texto, _fotosLocais);
       if (mounted) {
         Navigator.pop(context);
@@ -62,9 +66,6 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Pegando a largura pra deixar responsivo
-    final largura = MediaQuery.of(context).size.width;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Novo Relato'),
@@ -80,9 +81,9 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
             colors: [Colors.pink.shade50, Colors.white],
           ),
         ),
-        child: Center( // Centralizei pra nao ficar estranho no tablet/web
+        child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600), // Maximo de 600px de largura
+            constraints: const BoxConstraints(maxWidth: 600),
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 120, 20, 20),
               child: Column(
@@ -132,7 +133,6 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Se tiver fotos, a gente mostra elas aqui
                   if (_fotosLocais.isNotEmpty)
                     SizedBox(
                       height: 120,
@@ -152,11 +152,10 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                                   padding: const EdgeInsets.only(right: 12.0),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(16),
-                                    // AQUI TA A CORRECAO DO ERRO DO WEB!
-                                    // No web o Image.file nao funciona, entao usei o kIsWeb pra saber
+                                    // Usei o kIsWeb pra nao dar o erro de Platform
                                     child: kIsWeb 
                                       ? Image.network(path, width: 120, height: 120, fit: BoxFit.cover)
-                                      : Image.file(File(path), width: 120, height: 120, fit: BoxFit.cover),
+                                      : Image.file(io.File(path), width: 120, height: 120, fit: BoxFit.cover),
                                   ),
                                 ),
                               );

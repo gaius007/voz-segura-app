@@ -1,17 +1,44 @@
 import 'dart:ui';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/report.dart';
 
-// Tela que mostra todos os detalhes de um relato especifico
+// Tela de detalhes agora aceita fotos em Base64 (nosso Plano B)
 class ReportDetailPage extends StatelessWidget {
   final Report report;
 
   const ReportDetailPage({super.key, required this.report});
 
+  // Funcao ajudante pra mostrar a imagem de qualquer fonte
+  Widget _mostrarImagem(String path) {
+    if (path.startsWith('data:image')) {
+      try {
+        final base64String = path.split(',').last;
+        return Image.memory(
+          base64Url.decode(base64String),
+          fit: BoxFit.cover,
+        );
+      } catch (e) {
+        return const Icon(Icons.broken_image);
+      }
+    } else {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return Container(
+            color: Colors.pink.shade50,
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        },
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Formatei a data pra ficar facil de ler
     final dataLegal = DateFormat('dd/MM/yyyy HH:mm').format(report.createdAt);
 
     return Scaffold(
@@ -30,7 +57,7 @@ class ReportDetailPage extends StatelessWidget {
             colors: [Colors.pink.shade50, Colors.white],
           ),
         ),
-        child: Center( // Responsivo: centraliza no meio se a tela for grande
+        child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 800),
             child: SingleChildScrollView(
@@ -38,7 +65,6 @@ class ReportDetailPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Card principal com efeito de desfoque (Glass)
                   ClipRRect(
                     borderRadius: BorderRadius.circular(32),
                     child: BackdropFilter(
@@ -82,7 +108,6 @@ class ReportDetailPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Se tiver fotos, a gente mostra em grade
                   if (report.photoUrls.isEmpty)
                     const Text('Esse relato nao tem fotos.')
                   else
@@ -100,25 +125,13 @@ class ReportDetailPage extends StatelessWidget {
                           tag: index == 0 ? 'report-${report.id}' : 'photo-$index',
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20),
-                            // Carregando do Firebase Storage com Image.network
-                            child: Image.network(
-                              report.photoUrls[index],
-                              fit: BoxFit.cover,
-                              loadingBuilder: (context, child, progress) {
-                                if (progress == null) return child;
-                                return Container(
-                                  color: Colors.pink.shade50,
-                                  child: const Center(child: CircularProgressIndicator()),
-                                );
-                              },
-                            ),
+                            child: _mostrarImagem(report.photoUrls[index]),
                           ),
                         );
                       },
                     ),
                   const SizedBox(height: 40),
                   
-                  // Container pro Hash de seguranca
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(

@@ -1,67 +1,71 @@
-import 'dart:io';
+import 'dart:convert'; // Pra converter pra Base64
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/foundation.dart';
 import '../../domain/entities/report.dart';
 import '../../domain/repositories/report_repository.dart';
 
-// Essa classe aqui faz toda a parte chata de salvar no Firebase
-// Ela salva o texto no Firestore e as fotos no Storage
+// REPOSITORIO PLANO B: Usando Base64 porque o Storage pediu Upgrade de conta
 class ReportRepositoryImpl implements ReportRepository {
-  // Pegando as instancias do Firebase
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseStorage _storage = FirebaseStorage.instance;
   final Uuid _uuid = const Uuid();
 
   @override
   Future<void> createReport(Report report) async {
-    // 1. Primeiro a gente precisa de um ID pro relato
     final reportId = _uuid.v4();
-    
-    // 2. Agora a gente faz o upload de cada foto pro Storage
-    // Fiz uma lista pra guardar os links (URLs) das fotos na nuvem
-    List<String> linksDasFotos = [];
+    List<String> fotosEmBase64 = [];
 
-    // O professor falou pra usar pasta evidence_photos/
-    for (var caminhoLocal in report.photoUrls) { // aqui usamos o campo que passamos no novo()
-      File arquivo = File(caminhoLocal);
-      String nomeArquivo = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+    try {
+      debugPrint('VS: Iniciando criacao do relato via Base64');
+
+      // Em vez de subir pro Storage, a gente transforma em texto
+      for (var caminhoLocal in report.photoUrls) {
+        debugPrint('VS: Convertendo foto para Base64...');
+        final xFile = XFile(caminhoLocal);
+        final bytes = await xFile.readAsBytes();
+        
+        // O segredo eh esse: transformar os bytes da imagem em uma String
+        // Coloquei o prefixo 'data:image/jpeg;base64,' pra gente saber o que eh depois
+        String base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        fotosEmBase64.add(base64Image);
+        debugPrint('VS: Conversao concluida! Tamanho do texto: ${base64Image.length}');
+      }
+
+      // Agora salva tudo direto no Firestore
+      debugPrint('VS: Salvando tudo no Firestore...');
+      final hashSimples = 'vs_${reportId.substring(0, 5)}';
+
+      await _firestore.collection('reports').doc(reportId).set({
+        'description': report.description,
+        'createdAt': FieldValue.serverTimestamp(),
+        'photoUrls': fotosEmBase64, // Agora aqui vao as Strings do Base64
+        'contentHash': hashSimples,
+      }).timeout(const Duration(seconds: 20));
       
-      // Faz o upload pro Firebase Storage
-      Reference ref = _storage.ref().child('evidence_photos/$reportId/$nomeArquivo');
-      UploadTask uploadTask = ref.putFile(arquivo);
+      debugPrint('VS: Relato salvo com sucesso no Firestore!');
       
-      // Espera terminar e pega o link publico
-      TaskSnapshot snapshot = await uploadTask;
-      String url = await snapshot.ref.getDownloadURL();
-      linksDasFotos.add(url);
+    } catch (e) {
+      debugPrint('VS: ERRO no Plano B: $e');
+      rethrow; 
     }
-
-    // 3. Cria um hash simples pra fingir seguranca (vi no tutorial tb)
-    final hashSimples = 'firebase_${reportId.substring(0, 5)}';
-
-    // 4. Salva tudo no Firestore na colecao 'reports'
-    await _firestore.collection('reports').doc(reportId).set({
-      'description': report.description,
-      'createdAt': FieldValue.serverTimestamp(), // usa a hora do servidor pra nao dar erro
-      'photoUrls': linksDasFotos,
-      'contentHash': hashSimples,
-    });
-    
-    // Nao usei toMap() aqui direto pq o createdAt eh especial do Firebase
   }
 
   @override
   Future<List<Report>> getReports() async {
-    // Busca todos os relatos da colecao 'reports' ordenando pela data
-    QuerySnapshot snapshot = await _firestore
-        .collection('reports')
-        .orderBy('createdAt', descending: true)
-        .get();
+    try {
+      debugPrint('VS: Buscando relatos...');
+      QuerySnapshot snapshot = await _firestore
+          .collection('reports')
+          .orderBy('createdAt', descending: true)
+          .get();
 
-    // Transforma os documentos do Firebase nos nossos objetos Report
-    return snapshot.docs.map((doc) {
-      return Report.fromMap(doc.data() as Map<String, dynamic>, doc.id);
-    }).toList();
+      return snapshot.docs.map((doc) {
+        return Report.fromMap(doc.data() as Map<String, dynamic>, doc.id);
+      }).toList();
+    } catch (e) {
+      debugPrint('VS: Erro ao buscar: $e');
+      return [];
+    }
   }
 }

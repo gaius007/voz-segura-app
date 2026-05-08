@@ -1,14 +1,43 @@
 import 'dart:ui';
+import 'dart:convert'; // Pra decodificar o Base64
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/report.dart';
 import '../pages/report_detail_page.dart';
 
-// Widget do Card com efeito Glassmorphism
+// Card de relato atualizado pra mostrar imagens em Base64 ou URL
 class ReportCard extends StatelessWidget {
   final Report report;
 
   const ReportCard({super.key, required this.report});
+
+  // Funcao ajudante pra decidir se mostra Image.network ou Image.memory
+  Widget _mostrarImagem(String path, {required double size}) {
+    if (path.startsWith('data:image')) {
+      // Se comeca com data:image, eh o nosso Plano B (Base64)
+      try {
+        final base64String = path.split(',').last;
+        return Image.memory(
+          base64Url.decode(base64String),
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+        );
+      } catch (e) {
+        return const Icon(Icons.error);
+      }
+    } else {
+      // Senao, tenta carregar como link normal (legado)
+      return Image.network(
+        path,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +46,6 @@ class ReportCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        // Usei um branco bem transparente pra dar efeito de vidro
         color: Colors.white.withOpacity(0.7),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withOpacity(0.4)),
@@ -40,12 +68,7 @@ class ReportCard extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: report.photoUrls.isNotEmpty
-                    ? Image.network(
-                        report.photoUrls.first,
-                        width: 70,
-                        height: 70,
-                        fit: BoxFit.cover,
-                      )
+                    ? _mostrarImagem(report.photoUrls.first, size: 70)
                     : Container(
                         width: 70,
                         height: 70,

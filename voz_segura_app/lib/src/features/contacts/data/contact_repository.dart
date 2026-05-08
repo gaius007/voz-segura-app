@@ -1,12 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../domain/contact.dart';
 
-// Repositorio de contatos completo pro Firebase
-// Agora tem tudo: ler, salvar, editar e deletar
+// Repositorio de contatos com proteção de tempo (timeout)
 class ContactRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Fica de olho nos contatos do usuario logado
   Stream<List<Contact>> watchContacts(String userId) {
     return _firestore
         .collection('users')
@@ -19,16 +17,20 @@ class ContactRepository {
             }).toList());
   }
 
-  // Salva um contato novo na nuvem
+  // Salva contato novo (com limite de 15 segundos)
   Future<void> addContact(String userId, Contact contact) {
-    return _firestore.collection('users').doc(userId).collection('contacts').add({
-      ...contact.toMap(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('contacts')
+        .add({
+          ...contact.toMap(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        })
+        .timeout(const Duration(seconds: 15));
   }
 
-  // Atualiza um contato que ja existe
-  // O professor disse que eh importante ter o edit
+  // Edita contato (com limite de 15 segundos)
   Future<void> updateContact(String userId, Contact contact) {
     return _firestore
         .collection('users')
@@ -38,16 +40,18 @@ class ContactRepository {
         .update({
           ...contact.toMap(),
           'updatedAt': FieldValue.serverTimestamp(),
-        });
+        })
+        .timeout(const Duration(seconds: 15));
   }
 
-  // Remove o contato da rede de apoio
+  // Deleta contato
   Future<void> deleteContact(String userId, String contactId) {
     return _firestore
         .collection('users')
         .doc(userId)
         .collection('contacts')
         .doc(contactId)
-        .delete();
+        .delete()
+        .timeout(const Duration(seconds: 10));
   }
 }

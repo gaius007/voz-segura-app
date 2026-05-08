@@ -3,8 +3,7 @@ import '../../domain/entities/report.dart';
 import '../../domain/usecases/create_report.dart';
 import '../../domain/usecases/get_reports.dart';
 
-// Esse Notifier agora gerencia o estado usando o Firebase
-// O legal eh que os dados ficam salvos msm se desinstalar o app
+// Esse Notifier cuida da lista de relatos
 class ReportNotifier extends ChangeNotifier {
   final CreateReport createReportUseCase;
   final GetReports getReportsUseCase;
@@ -20,7 +19,7 @@ class ReportNotifier extends ChangeNotifier {
     required this.getReportsUseCase,
   });
 
-  // Puxa os relatos do Firestore
+  // Busca do Firestore
   Future<void> carregarRelatos() async {
     _isLoading = true;
     notifyListeners(); 
@@ -30,29 +29,31 @@ class ReportNotifier extends ChangeNotifier {
     } catch (e) {
       debugPrint('Erro ao carregar do Firestore: $e');
     } finally {
+      // O finally eh importante pro loading sumir msm se der erro!
       _isLoading = false;
       notifyListeners(); 
     }
   }
 
-  // Manda criar o relato e fazer upload das fotos
+  // Cria um relato novo
   Future<void> adicionarRelato(String descricao, List<String> fotos) async {
-    // Aqui a gente cria o objeto com os caminhos locais
-    // O Repositorio vai cuidar de subir pro Storage
     final novoRelato = Report(
       id: '',
       description: descricao,
       createdAt: DateTime.now(),
-      photoUrls: fotos, // passa os caminhos locais por enquanto
+      photoUrls: fotos,
       contentHash: '',
     );
 
     try {
+      // Manda pro Repository subir tudo
       await createReportUseCase.execute(novoRelato);
-      // Depois que terminou de subir tudo, atualiza a lista
+      
+      // Depois que salvou, a gente tenta atualizar a lista na tela
       await carregarRelatos();
     } catch (e) {
-      debugPrint('Erro ao salvar no Firebase: $e');
+      // Se der erro aqui, a gente avisa a tela
+      debugPrint('Erro no Notifier ao salvar: $e');
       rethrow; 
     }
   }
