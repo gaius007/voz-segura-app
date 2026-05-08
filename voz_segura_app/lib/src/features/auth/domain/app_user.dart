@@ -1,15 +1,31 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+// Classe que representa o usuario do app
+// O professor disse que eh bom ter os campos final pra nao dar bug de estado
+class AppUser {
+  final String uid;
+  final String email;
+  final String? displayName;
 
-part 'app_user.freezed.dart';
-part 'app_user.g.dart';
+  AppUser({
+    required this.uid,
+    required this.email,
+    this.displayName,
+  });
 
-@freezed
-class AppUser with _$AppUser {
-  const factory AppUser({
-    required String uid,
-    required String email,
-    String? displayName,
-  }) = _AppUser;
+  // Transforma o JSON do Firebase no nosso objeto de usuario
+  factory AppUser.fromMap(Map<String, dynamic> map) {
+    return AppUser(
+      uid: map['uid'] ?? '',
+      email: map['email'] ?? '',
+      displayName: map['displayName'],
+    );
+  }
 
-  factory AppUser.fromJson(Map<String, dynamic> json) => _$AppUserFromJson(json);
+  // Transforma o usuario em Map pra salvar no banco se precisar
+  Map<String, dynamic> toMap() {
+    return {
+      'uid': uid,
+      'email': email,
+      'displayName': displayName,
+    };
+  }
 }

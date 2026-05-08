@@ -1,28 +1,26 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'sos_controller.dart';
+import 'package:provider/provider.dart';
+import 'sos_notifier.dart';
 
-class HomePage extends ConsumerStatefulWidget {
+// Tela principal com o botao de panico. Tentei deixar bem chamativo!
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  ConsumerState<HomePage> createState() => _HomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderStateMixin {
+class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
+    // Fiz essa animacao pro botao ficar "pulsando" quando o SOS ta ligado
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
-    );
-    _animation = Tween<double>(begin: 1.0, end: 1.5).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
   }
 
   @override
@@ -30,116 +28,97 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
     _controller.dispose();
     super.dispose();
   }
-
-  void _handleSOSToggle() {
-    final notifier = ref.read(sOSControllerProvider.notifier);
-    notifier.toggleSOS();
-    
-    final isActive = ref.read(sOSControllerProvider);
-    if (isActive) {
-      _controller.repeat();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("SOS Disparado! Enviando alerta para sua rede de apoio..."),
-          backgroundColor: Colors.pink,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } else {
-      _controller.stop();
-      _controller.reset();
-    }
-  }
-
-  Future<void> _logout() async {
-    await ref.read(sOSControllerProvider.notifier).logout();
-    if (mounted) {
-      Navigator.pushReplacementNamed(context, '/login');
-    }
-  }
-
+  
   @override
   Widget build(BuildContext context) {
-    final isSOSActive = ref.watch(sOSControllerProvider);
+    final sosNotifier = context.watch<SOSNotifier>();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Comando Central"),
+        title: const Text('Botão de Pânico'),
+        centerTitle: true,
         actions: [
+          // Botao pra deslogar do Firebase
           IconButton(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout),
-          )
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: () => sosNotifier.logout(),
+          ),
         ],
       ),
-      body: Stack(
-        children: [
-          Positioned(
-            top: -50,
-            right: -50,
-            child: Container(
-              width: 200,
-              height: 200,
-              decoration: BoxDecoration(color: Colors.pink.shade100.withValues(alpha: 0.3), shape: BoxShape.circle),
-            ),
+      body: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white, Colors.pink.shade50],
           ),
-          Center(
+        ),
+        child: Center( // Deixando centralizado pra telas grandes
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text(
-                  "Precisa de ajuda?",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.pink),
+                  'VOCÊ ESTÁ SEGURA?',
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFFFF4081), letterSpacing: 2),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 const Text(
-                  "Pressione o botão abaixo para alertar sua rede.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.black54),
+                  'Se sentir perigo, aperte o botão abaixo',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
                 ),
                 const SizedBox(height: 60),
                 
                 GestureDetector(
-                  onTap: _handleSOSToggle,
+                  onTap: () => sosNotifier.toggleSOS(),
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      AnimatedBuilder(
-                        animation: _animation,
-                        builder: (context, child) {
-                          return Container(
-                            width: 160 * _animation.value,
-                            height: 160 * _animation.value,
+                      // Efeito de pulso vermelho se o SOS tiver ativo
+                      if (sosNotifier.isSOSActive)
+                        ScaleTransition(
+                          scale: Tween(begin: 1.0, end: 1.2).animate(_controller),
+                          child: Container(
+                            width: 220,
+                            height: 220,
                             decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.3),
                               shape: BoxShape.circle,
-                              color: Colors.pink.withValues(alpha: 0.2 * (1.5 - _animation.value)),
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        ),
+                      // O botao principal
                       Container(
-                        width: 140,
-                        height: 140,
+                        width: 200,
+                        height: 200,
                         decoration: BoxDecoration(
+                          color: sosNotifier.isSOSActive ? Colors.red : Colors.grey.shade300,
                           shape: BoxShape.circle,
-                          color: isSOSActive ? Colors.pink : Colors.pinkAccent,
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.pink.withValues(alpha: 0.4),
+                              color: (sosNotifier.isSOSActive ? Colors.red : Colors.grey).withOpacity(0.4),
                               blurRadius: 20,
                               spreadRadius: 5,
                             ),
                           ],
                         ),
                         child: Center(
-                          child: Text(
-                            isSOSActive ? "ENVIANDO" : "SOS",
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 2,
-                            ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                sosNotifier.isSOSActive ? Icons.warning_rounded : Icons.shield_rounded,
+                                color: Colors.white,
+                                size: 60,
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'SOS',
+                                style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -147,30 +126,30 @@ class _HomePageState extends ConsumerState<HomePage> with SingleTickerProviderSt
                   ),
                 ),
                 
-                const SizedBox(height: 80),
-                
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 40),
-                  child: ElevatedButton.icon(
-                    onPressed: () => Navigator.pushNamed(context, '/contacts'),
-                    icon: const Icon(Icons.people_outline),
-                    label: const Text("Gerenciar Rede de Apoio"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.pink,
-                      minimumSize: const Size(double.infinity, 56),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: const BorderSide(color: Colors.pink, width: 1),
-                      ),
-                      elevation: 0,
+                const SizedBox(height: 60),
+                // Avisando se o socorro ja foi pedido
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: sosNotifier.isSOSActive ? Colors.red.shade50 : Colors.blueGrey.shade50,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Text(
+                    sosNotifier.isSOSActive 
+                      ? '⚠️ SOCORRO SOLICITADO!' 
+                      : 'Proteção Ativada',
+                    style: TextStyle(
+                      color: sosNotifier.isSOSActive ? Colors.red : Colors.blueGrey,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

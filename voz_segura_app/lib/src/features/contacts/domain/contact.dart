@@ -1,17 +1,40 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+// Classe que representa um contato de emergencia
+// Fiz uma classe normal msm pra ser mais direto
+class Contact {
+  final String? id;
+  final String name;
+  final String type;
+  final String value;
+  final DateTime? updatedAt;
 
-part 'contact.freezed.dart';
-part 'contact.g.dart';
+  Contact({
+    this.id,
+    required this.name,
+    required this.type,
+    required this.value,
+    this.updatedAt,
+  });
 
-@freezed
-class Contact with _$Contact {
-  const factory Contact({
-    String? id,
-    required String name,
-    required String type,
-    required String value,
-    DateTime? updatedAt,
-  }) = _Contact;
+  // Converte o Map do banco (SQLite ou Firebase) pro nosso objeto
+  factory Contact.fromMap(Map<String, dynamic> map, [String? docId]) {
+    return Contact(
+      id: docId ?? map['id'],
+      name: map['name'] ?? '',
+      type: map['type'] ?? '',
+      value: map['value'] ?? '',
+      updatedAt: map['updatedAt'] != null 
+          ? (map['updatedAt'] as dynamic).toDate() 
+          : null,
+    );
+  }
 
-  factory Contact.fromJson(Map<String, dynamic> json) => _$ContactFromJson(json);
+  // Converte pra Map pra salvar na nuvem
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'type': type,
+      'value': value,
+      'updatedAt': updatedAt ?? DateTime.now(),
+    };
+  }
 }

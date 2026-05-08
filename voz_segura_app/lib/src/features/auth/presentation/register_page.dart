@@ -1,111 +1,70 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'auth_controller.dart';
+import 'package:provider/provider.dart';
+import '../data/auth_repository.dart';
 
-class RegisterPage extends ConsumerStatefulWidget {
+// Tela pra criar conta no Firebase
+class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
 
   @override
-  ConsumerState<RegisterPage> createState() => _RegisterPageState();
+  State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterPageState extends ConsumerState<RegisterPage> {
+class _RegisterPageState extends State<RegisterPage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool _isLoading = false;
 
   Future<void> _onRegister() async {
-    final success = await ref.read(authControllerProvider.notifier).register(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
-      _nameController.text.trim(),
-    );
-
-    if (success && mounted) {
-      Navigator.pushReplacementNamed(context, '/home');
-    } else if (mounted) {
-      final error = ref.read(authControllerProvider).error;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error?.toString() ?? "Erro ao registrar"),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-        ),
+    setState(() => _isLoading = true);
+    try {
+      // Chama o repositorio pra criar o usuario
+      await context.read<AuthRepository>().signUp(
+        _emailController.text,
+        _passwordController.text,
       );
+      if (mounted) Navigator.pop(context); // volta pro login se deu certo
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao registrar: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
-    final isLoading = authState.isLoading;
-
     return Scaffold(
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
-      extendBodyBehindAppBar: true,
-      body: Container(
+      appBar: AppBar(title: const Text('Criar Conta')),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.deepPurple.shade50, Colors.white],
-          ),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 80),
-              const Text(
-                "Criar Conta",
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.black),
-              ),
-              const SizedBox(height: 8),
-              const Text("Junte-se ao Voz Segura e comece agora."),
-              const SizedBox(height: 48),
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: "Nome Completo",
-                  prefixIcon: Icon(Icons.person_outline),
+        child: Column(
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: "Nome Completo"),
+            ),
+            TextField(
+              controller: _emailController,
+              decoration: const InputDecoration(labelText: "E-mail"),
+            ),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: "Senha"),
+            ),
+            const SizedBox(height: 32),
+            _isLoading 
+              ? const CircularProgressIndicator()
+              : ElevatedButton(
+                  onPressed: _onRegister,
+                  child: const Text("Registrar"),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: "E-mail",
-                  prefixIcon: Icon(Icons.email_outlined),
-                ),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: "Senha",
-                  prefixIcon: Icon(Icons.password_outlined),
-                ),
-              ),
-              const SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: isLoading ? null : _onRegister,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF815A68),
-                ),
-                child: isLoading 
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text("Registrar", style: TextStyle(fontSize: 16)),
-              ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Já tem uma conta? Faça login"),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
