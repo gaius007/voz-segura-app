@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'camouflage_notifier.dart';
 import 'news_service.dart';
 
@@ -16,6 +17,7 @@ class _CamouflageViewState extends State<CamouflageView> {
   List<NewsArticle> _articles = [];
   bool _isLoading = true;
   Timer? _longPressTimer;
+  DateTime? _pressStartTime;
   double _progress = 0.0;
 
   @override
@@ -34,24 +36,40 @@ class _CamouflageViewState extends State<CamouflageView> {
     }
   }
 
-  void _startTimer(BuildContext context) {
-    setState(() => _progress = 0.0);
-    _longPressTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+  void _onPressDown() {
+    _pressStartTime = DateTime.now();
+    _longPressTimer?.cancel();
+    _longPressTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      final elapsed = DateTime.now().difference(_pressStartTime!).inMilliseconds;
       setState(() {
-        _progress += 0.02; // 0.02 * 50 steps = 1.0 (5 seconds)
+        _progress = (elapsed / 5000.0).clamp(0.0, 1.0);
       });
+      
       if (_progress >= 1.0) {
         timer.cancel();
-        context.read<CamouflageNotifier>().setCamouflaged(false);
+        _deactivate();
       }
     });
   }
 
-  void _cancelTimer() {
+  void _onPressUp() {
     _longPressTimer?.cancel();
     setState(() {
       _progress = 0.0;
     });
+  }
+
+  void _deactivate() {
+    context.read<CamouflageNotifier>().setCamouflaged(false);
+  }
+
+  Future<void> _launchURL(String? urlString) async {
+    if (urlString == null) return;
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      // Se falhar, abre internamente como fallback
+      _openFakeArticle('Notícia', 'Não foi possível carregar o link original.');
+    }
   }
 
   @override
@@ -83,35 +101,49 @@ class _CamouflageViewState extends State<CamouflageView> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.black))
-          : ListView.separated(
-              itemCount: _articles.length + 1, // +1 para a notícia secreta
-              separatorBuilder: (context, index) => const Divider(height: 1, color: Colors.black26),
-              itemBuilder: (context, index) {
-                // Inserimos a notícia secreta no meio da lista (ex: posição 2)
-                if (index == 2) {
-                  return _buildSecretArticle(context, secretWord);
-                }
+          : RefreshIndicator(
+              onRefresh: _loadNews,
+              color: Colors.black,
+              child: ListView.separated(
+                itemCount: _articles.length + 1,
+                separatorBuilder: (context, index) => const Divider(height: 1, color: Colors.black26),
+                itemBuilder: (context, index) {
+                  // Inserir a notícia secreta na 3ª posição
+                  if (index == 2) {
+                    return _buildSecretArticle(secretWord);
+                  }
 
-                final articleIndex = index > 2 ? index - 1 : index;
-                if (articleIndex >= _articles.length) return const SizedBox.shrink();
-                
-                final article = _articles[articleIndex];
-                return _buildNewsItem(context, article);
-              },
+                  final articleIndex = index > 2 ? index - 1 : index;
+                  if (articleIndex >= _articles.length) return const SizedBox.shrink();
+                  
+                  final article = _articles[articleIndex];
+                  return _buildNewsItem(article);
+                },
+              ),
             ),
     );
   }
 
-  Widget _buildNewsItem(BuildContext context, NewsArticle article) {
+  Widget _buildNewsItem(NewsArticle article) {
     return InkWell(
-      onTap: () => _openArticle(context, article.title, article.description),
+      onTap: () => _launchURL(article.link),
       child: Container(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (article.imageUrl != null) ...[
+              Image.network(
+                article.imageUrl!,
+                height: 150,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+              const SizedBox(height: 12),
+            ],
             Text(
-              article.source?.toUpperCase() ?? 'NOTÍCIAS BRASIL',
+              article.source?.toUpperCase() ?? 'PORTAL BRASIL',
               style: TextStyle(color: Colors.grey[700], fontSize: 10, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
@@ -125,11 +157,11 @@ class _CamouflageViewState extends State<CamouflageView> {
                 height: 1.2,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
               article.description,
               style: TextStyle(color: Colors.grey[800], fontSize: 14, fontFamily: 'Serif'),
-              maxLines: 2,
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
           ],
@@ -138,21 +170,25 @@ class _CamouflageViewState extends State<CamouflageView> {
     );
   }
 
-  Widget _buildSecretArticle(BuildContext context, String secretWord) {
+  Widget _buildSecretArticle(String secretWord) {
     return GestureDetector(
-      onTap: () => _openArticle(context, secretWord, 'Conteúdo detalhado sobre esta notícia importante do dia.'),
-      onLongPressStart: (_) => _startTimer(context),
-      onLongPressEnd: (_) => _cancelTimer(),
+      onTapDown: (_) => _onPressDown(),
+      onTapUp: (_) => _onPressUp(),
+      onTapCancel: () => _onPressUp(),
+      onTap: () {
+        // Se clicar rápido, apenas abre o artigo fake
+        _openFakeArticle(secretWord, 'Este artigo contém informações detalhadas sobre o cenário atual do mercado e tendências tecnológicas.');
+      },
       child: Stack(
         children: [
           Container(
             padding: const EdgeInsets.all(20),
-            color: _progress > 0 ? Colors.grey[100] : Colors.white,
+            color: _progress > 0 ? Colors.grey[200] : Colors.white,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Destaque do Editor'.toUpperCase(),
+                  'ESPECIAL'.toUpperCase(),
                   style: TextStyle(color: Colors.grey[700], fontSize: 10, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
@@ -166,11 +202,11 @@ class _CamouflageViewState extends State<CamouflageView> {
                     height: 1.2,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 const Text(
-                  'Análise profunda sobre os impactos globais e as novas tendências do setor para o próximo semestre.',
+                  'Acompanhe nossa cobertura completa sobre este tema que está dominando as discussões globais nesta semana.',
                   style: TextStyle(color: Colors.black87, fontSize: 14, fontFamily: 'Serif'),
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
@@ -185,7 +221,7 @@ class _CamouflageViewState extends State<CamouflageView> {
                 value: _progress,
                 backgroundColor: Colors.transparent,
                 valueColor: const AlwaysStoppedAnimation<Color>(Colors.black),
-                minHeight: 4,
+                minHeight: 6,
               ),
             ),
         ],
@@ -193,7 +229,7 @@ class _CamouflageViewState extends State<CamouflageView> {
     );
   }
 
-  void _openArticle(BuildContext context, String title, String content) {
+  void _openFakeArticle(String title, String content) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -213,10 +249,10 @@ class _CamouflageViewState extends State<CamouflageView> {
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'Serif'),
                 ),
                 const SizedBox(height: 16),
-                const Divider(color: Colors.black),
+                const Divider(color: Colors.black, thickness: 2),
                 const SizedBox(height: 16),
                 Text(
-                  content + '\n\n' + 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. ' * 20,
+                  content + '\n\n' + 'Conteúdo jornalístico simulado para manter a integridade do modo camuflagem. ' * 15,
                   style: const TextStyle(fontSize: 16, fontFamily: 'Serif', height: 1.6),
                 ),
               ],

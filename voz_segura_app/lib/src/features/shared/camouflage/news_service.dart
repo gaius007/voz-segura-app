@@ -6,30 +6,31 @@ class NewsArticle {
   final String description;
   final String? imageUrl;
   final String? source;
-  final String? content;
+  final String? link;
 
   NewsArticle({
     required this.title,
     required this.description,
     this.imageUrl,
     this.source,
-    this.content,
+    this.link,
   });
 
   factory NewsArticle.fromJson(Map<String, dynamic> json) {
     return NewsArticle(
-      title: json['title'] ?? '',
-      description: json['description'] ?? '',
+      title: json['title'] ?? 'Sem título',
+      description: json['description'] ?? 'Sem descrição disponível.',
       imageUrl: json['image_url'],
       source: json['source_id'],
-      content: json['content'],
+      link: json['link'],
     );
   }
 }
 
 class NewsService {
-  // ATENÇÃO: O usuário deve substituir esta chave pela sua chave real do NewsData.io
-  static const String _apiKey = 'pub_4ee4905895574d39a937badb0643d8bd'; // Exemplo de formato
+  // O usuário deve trocar por uma chave válida. 
+  // Esta chave abaixo é um exemplo e pode estar expirada.
+  static const String _apiKey = 'pub_4ee4905895574d39a937badb0643d8bd'; 
 
   Future<List<NewsArticle>> fetchNews() async {
     try {
@@ -37,15 +38,16 @@ class NewsService {
         Uri.parse(
           'https://newsdata.io/api/1/news?apikey=$_apiKey&country=br&language=pt&category=top'
         ),
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final List results = data['results'] ?? [];
-        return results.map((json) => NewsArticle.fromJson(json)).toList();
-      } else {
-        return _getMockNews();
+        if (data['status'] == 'success') {
+          final List results = data['results'] ?? [];
+          return results.map((json) => NewsArticle.fromJson(json)).toList();
+        }
       }
+      return _getMockNews();
     } catch (e) {
       return _getMockNews();
     }
@@ -54,24 +56,22 @@ class NewsService {
   List<NewsArticle> _getMockNews() {
     return [
       NewsArticle(
-        title: 'Mercado financeiro apresenta estabilidade nesta manhã',
-        description: 'Os principais índices da bolsa operam em leve alta acompanhando o cenário externo.',
-        source: 'Economia Hoje',
+        title: 'Bolsa de Valores fecha em alta com otimismo no setor de tecnologia',
+        description: 'Investidores reagem positivamente aos balanços trimestrais das gigantes do setor.',
+        source: 'Portal Econômico',
+        link: 'https://g1.globo.com/economia/',
       ),
       NewsArticle(
-        title: 'Novas tecnologias de irrigação aumentam produtividade no campo',
-        description: 'Produtores rurais do interior de São Paulo adotam sistemas inteligentes para otimizar o uso da água.',
-        source: 'Agro News',
+        title: 'Brasil atinge marca histórica na exportação de energia limpa',
+        description: 'País se consolida como líder global em matriz energética sustentável.',
+        source: 'Notícias Sustentáveis',
+        link: 'https://www.cnnbrasil.com.br/',
       ),
       NewsArticle(
-        title: 'Cresce a busca por cursos de especialização técnica',
-        description: 'Instituições de ensino relatam aumento de 25% na procura por cursos de curta duração em tecnologia.',
-        source: 'Educação & Carreira',
-      ),
-      NewsArticle(
-        title: 'Previsão do tempo indica chuvas isoladas na região sul',
-        description: 'Frente fria deve chegar ao litoral catarinense no final de semana, trazendo queda nas temperaturas.',
-        source: 'Clima Tempo',
+        title: 'Estudo revela segredos da longevidade em populações litorâneas',
+        description: 'Pesquisa acompanhou mil idosos durante uma década para entender hábitos saudáveis.',
+        source: 'Saúde & Bem-Estar',
+        link: 'https://saude.abril.com.br/',
       ),
     ];
   }
