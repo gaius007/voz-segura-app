@@ -54,8 +54,19 @@ class _CamouflageDialogState extends State<CamouflageDialog> {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Este modo altera completamente o visual do app para disfarçá-lo como um aplicativo de notícias genérico. Isso protege sua privacidade caso alguém acesse seu celular.',
+              'Este modo altera completamente o visual do app para disfarçá-lo como um portal de notícias genérico. Isso protege sua privacidade caso alguém acesse seu celular.',
               style: AppStyles.subtitle,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Como funciona:',
+              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textMain),
+            ),
+            const Text(
+              '1. Sua palavra secreta será o título de uma notícia.\n'
+              '2. Para sair do modo camuflagem, você deve encontrar essa notícia e SEGURAR O DEDO por 5 segundos nela.\n'
+              '3. Um clique comum apenas abrirá a notícia normalmente.',
+              style: TextStyle(fontSize: 13, color: AppColors.textMain),
             ),
             const SizedBox(height: 16),
             const Text(
