@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../manager/report_notifier.dart';
-// Removi o dart:io direto pra nao dar erro no navegador
-// O professor disse que eh melhor usar o kIsWeb pra separar as coisas
-import 'dart:io' as io; 
+import 'dart:io' as io;
+import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 
 class ReportCreatePage extends StatefulWidget {
   const ReportCreatePage({super.key});
@@ -21,12 +20,11 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
   bool _enviando = false;
 
   Future<void> _abrirCamera() async {
-    // Diminui o tamanho da foto pra caber no Firestore (Plano B do professor)
     final XFile? image = await _picker.pickImage(
       source: ImageSource.camera,
       maxWidth: 800,
       maxHeight: 800,
-      imageQuality: 70, // Qualidade 70% ja ta otimo e fica leve
+      imageQuality: 70,
     );
     if (image != null) {
       setState(() {
@@ -39,7 +37,7 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
     final texto = _descController.text;
     if (texto.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Escreve o relato primeiro!')),
+        const SnackBar(content: Text('Por favor, descreva o acontecimento.')),
       );
       return;
     }
@@ -50,13 +48,17 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Relato enviado com sucesso! 🎉')),
+          const SnackBar(
+            content: Text('Relato seguro enviado com sucesso!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro: $e')),
+          SnackBar(content: Text('Erro: $e'), backgroundColor: AppColors.ruby),
         );
       }
     } finally {
@@ -67,72 +69,70 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Novo Relato'),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
       ),
-      extendBodyBehindAppBar: true,
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.pink.shade50, Colors.white],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.sakura, Colors.white],
           ),
         ),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 600),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 120, 20, 20),
+              padding: const EdgeInsets.all(28),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const Text(
-                    'O que aconteceu?',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFFFF4081)),
+                    'DETALHES DO RELATO',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ruby, letterSpacing: 1.5),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: _descController,
-                    maxLines: 6,
+                    maxLines: 8,
                     enabled: !_enviando,
-                    decoration: InputDecoration(
-                      hintText: 'Conte aqui os detalhes importantes...',
-                      fillColor: Colors.white.withOpacity(0.8),
-                      filled: true,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: BorderSide.none,
-                      ),
+                    decoration: const InputDecoration(
+                      hintText: 'Descreva aqui o que aconteceu com o máximo de detalhes possível para sua segurança...',
+                      alignLabelWithHint: true,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 40),
                   const Text(
-                    'Fotos e Provas',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    'EVIDÊNCIAS VISUAIS',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ruby, letterSpacing: 1.5),
                   ),
                   const SizedBox(height: 16),
                   InkWell(
                     onTap: _enviando ? null : _abrirCamera,
+                    borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      height: 100,
+                      height: 120,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withOpacity(0.6),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.pink.shade100, style: BorderStyle.solid),
+                        border: Border.all(color: AppColors.rose.withOpacity(0.5), width: 1.5),
                       ),
-                      child: Column(
+                      child: const Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.add_a_photo_rounded, size: 32, color: Color(0xFFFF4081)),
-                          Text('Tirar Foto', style: TextStyle(color: Color(0xFFFF4081), fontWeight: FontWeight.w600)),
+                        children: [
+                          Icon(Icons.camera_enhance_rounded, size: 36, color: AppColors.primary),
+                          SizedBox(height: 8),
+                          Text(
+                            'CAPTURAR EVIDÊNCIA',
+                            style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                   if (_fotosLocais.isNotEmpty)
                     SizedBox(
                       height: 120,
@@ -141,42 +141,50 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                         itemCount: _fotosLocais.length,
                         itemBuilder: (context, index) {
                           final path = _fotosLocais[index];
-                          
-                          return TweenAnimationBuilder(
-                            duration: const Duration(milliseconds: 300),
-                            tween: Tween<double>(begin: 0, end: 1),
-                            builder: (context, val, child) {
-                              return Transform.scale(
-                                scale: val,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(right: 12.0),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    // Usei o kIsWeb pra nao dar o erro de Platform
-                                    child: kIsWeb 
-                                      ? Image.network(path, width: 120, height: 120, fit: BoxFit.cover)
-                                      : Image.file(io.File(path), width: 120, height: 120, fit: BoxFit.cover),
-                                  ),
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Hero(
+                              tag: 'new-photo-$index',
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: AppStyles.softShadow,
                                 ),
-                              );
-                            },
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: kIsWeb 
+                                    ? Image.network(path, width: 120, height: 120, fit: BoxFit.cover)
+                                    : Image.file(io.File(path), width: 120, height: 120, fit: BoxFit.cover),
+                                ),
+                              ),
+                            ),
                           );
                         },
                       ),
                     ),
-                  const SizedBox(height: 48),
+                  const SizedBox(height: 60),
                   _enviando 
                     ? const Center(child: CircularProgressIndicator())
                     : ElevatedButton(
                         onPressed: _salvarNoFirebase,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFFF4081),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                          minimumSize: const Size(double.infinity, 65),
+                          backgroundColor: AppColors.primary,
+                          elevation: 10,
+                          shadowColor: AppColors.primary.withOpacity(0.4),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                         ),
-                        child: const Text('ENVIAR AGORA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+                        child: const Text(
+                          'ENVIAR RELATO SEGURO',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.white),
+                        ),
                       ),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Suas informações são criptografadas e protegidas.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11, color: AppColors.textLight, fontStyle: FontStyle.italic),
+                  ),
                 ],
               ),
             ),

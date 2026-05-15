@@ -1,8 +1,10 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'sos_notifier.dart';
+import 'widgets/secure_sos_button.dart';
+import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 
-// Tela principal com o botao de panico. Tentei deixar bem chamativo!
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -16,10 +18,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    // Fiz essa animacao pro botao ficar "pulsando" quando o SOS ta ligado
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 1),
+      duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
   }
 
@@ -34,121 +35,128 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     final sosNotifier = context.watch<SOSNotifier>();
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Botão de Pânico'),
-        centerTitle: true,
+        title: const Text('VOZ SEGURA'),
         actions: [
-          // Botao pra deslogar do Firebase
           IconButton(
-            icon: const Icon(Icons.logout_rounded),
+            icon: const Icon(Icons.power_settings_new_rounded),
             onPressed: () => sosNotifier.logout(),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: Stack(
+        children: [
+          // Background decorative elements
+          Positioned(
+            top: -50,
+            right: -50,
+            child: _buildBlurCircle(AppColors.rose.withOpacity(0.4), 200),
+          ),
+          Positioned(
+            bottom: 100,
+            left: -100,
+            child: _buildBlurCircle(AppColors.lilac.withOpacity(0.5), 300),
+          ),
+          
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Animated Header
+                  TweenAnimationBuilder(
+                    duration: const Duration(seconds: 1),
+                    tween: Tween<double>(begin: 0, end: 1),
+                    builder: (context, double val, child) {
+                      return Opacity(
+                        opacity: val,
+                        child: Transform.translate(
+                          offset: Offset(0, 20 * (1 - val)),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Column(
+                      children: [
+                        const Text(
+                          'SENTE-SE SEGURA?',
+                          style: AppStyles.h1,
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Em caso de perigo, mantenha o botão\npressionado para alertar sua rede.',
+                          textAlign: TextAlign.center,
+                          style: AppStyles.subtitle,
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 60),
+                  
+                  // The button
+                  const SecureSOSButton(),
+                  
+                  const SizedBox(height: 60),
+                  
+                  // Visual feedback for active SOS
+                  if (sosNotifier.isSOSActive)
+                    _buildActiveSOSBadge(),
+                ],
+              ),
+            ),
           ),
         ],
       ),
-      body: Container(
-        width: double.infinity,
+    );
+  }
+
+  Widget _buildBlurCircle(Color color, double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+        child: Container(color: Colors.transparent),
+      ),
+    );
+  }
+
+  Widget _buildActiveSOSBadge() {
+    return ScaleTransition(
+      scale: Tween(begin: 1.0, end: 1.05).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.white, Colors.pink.shade50],
-          ),
-        ),
-        child: Center( // Deixando centralizado pra telas grandes
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  'VOCÊ ESTÁ SEGURA?',
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFFFF4081), letterSpacing: 2),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Se sentir perigo, aperte o botão abaixo',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-                const SizedBox(height: 60),
-                
-                GestureDetector(
-                  onTap: () => sosNotifier.toggleSOS(),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Efeito de pulso vermelho se o SOS tiver ativo
-                      if (sosNotifier.isSOSActive)
-                        ScaleTransition(
-                          scale: Tween(begin: 1.0, end: 1.2).animate(_controller),
-                          child: Container(
-                            width: 220,
-                            height: 220,
-                            decoration: BoxDecoration(
-                              color: Colors.red.withOpacity(0.3),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                      // O botao principal
-                      Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          color: sosNotifier.isSOSActive ? Colors.red : Colors.grey.shade300,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: (sosNotifier.isSOSActive ? Colors.red : Colors.grey).withOpacity(0.4),
-                              blurRadius: 20,
-                              spreadRadius: 5,
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                sosNotifier.isSOSActive ? Icons.warning_rounded : Icons.shield_rounded,
-                                color: Colors.white,
-                                size: 60,
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'SOS',
-                                style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                const SizedBox(height: 60),
-                // Avisando se o socorro ja foi pedido
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: sosNotifier.isSOSActive ? Colors.red.shade50 : Colors.blueGrey.shade50,
-                    borderRadius: BorderRadius.circular(30),
-                  ),
-                  child: Text(
-                    sosNotifier.isSOSActive 
-                      ? '⚠️ SOCORRO SOLICITADO!' 
-                      : 'Proteção Ativada',
-                    style: TextStyle(
-                      color: sosNotifier.isSOSActive ? Colors.red : Colors.blueGrey,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
+          color: AppColors.ruby,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.ruby.withOpacity(0.3),
+              blurRadius: 15,
+              spreadRadius: 2,
             ),
-          ),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.notifications_active_rounded, color: Colors.white, size: 18),
+            SizedBox(width: 8),
+            Text(
+              'ALERTAS ATIVOS',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1.2),
+            ),
+          ],
         ),
       ),
     );

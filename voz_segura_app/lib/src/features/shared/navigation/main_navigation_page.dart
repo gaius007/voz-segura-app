@@ -4,8 +4,8 @@ import '../../reports/presentation/pages/report_list_page.dart';
 import '../../reports/presentation/pages/report_create_page.dart';
 import '../../sos/presentation/home_page.dart';
 import '../../contacts/presentation/emergency_contacts_page.dart';
+import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 
-// Tela principal com o menu de vidro e o botao que nao cobre nada
 class MainNavigationPage extends StatefulWidget {
   const MainNavigationPage({super.key});
 
@@ -25,11 +25,39 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
-      body: _telas[_indice],
+      extendBody: true, // Crucial for glass navigation effect
+      body: Stack(
+        children: [
+          // Background Gradient base
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.sakura, Colors.white, AppColors.blush],
+              ),
+            ),
+          ),
+          // Content
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.05, 0),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: _telas[_indice],
+          ),
+        ],
+      ),
       
-      // O botao agora fica aqui na Main pra gente controlar melhor
-      // Ele so aparece se estivermos na aba de Relatos
       floatingActionButton: _indice == 1 
         ? FloatingActionButton(
             onPressed: () {
@@ -38,48 +66,84 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                 MaterialPageRoute(builder: (context) => const ReportCreatePage()),
               );
             },
-            backgroundColor: const Color(0xFFFF4081),
-            foregroundColor: Colors.white,
-            shape: const CircleBorder(),
-            child: const Icon(Icons.add_photo_alternate_rounded),
+            backgroundColor: AppColors.primary,
+            elevation: 8,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: const Icon(Icons.add_photo_alternate_rounded, color: Colors.white),
           )
         : null,
       
-      // Usei o centerFloat e dei um padding pro botao ficar ACIMA da barra
-      // Assim ele nao tampa nenhum icone e fica centralizado bonitinho
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       
-      bottomNavigationBar: Container(
-        margin: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Container(
-              height: 70,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.white.withOpacity(0.3)),
-              ),
-              child: BottomNavigationBar(
-                currentIndex: _indice,
-                onTap: (index) => setState(() => _indice = index),
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                selectedItemColor: const Color(0xFFFF4081),
-                unselectedItemColor: Colors.grey,
-                showUnselectedLabels: false,
-                type: BottomNavigationBarType.fixed,
-                items: const [
-                  BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-                  BottomNavigationBarItem(icon: Icon(Icons.assignment_rounded), label: 'Relatos'),
-                  BottomNavigationBarItem(icon: Icon(Icons.people_rounded), label: 'Contatos'),
-                ],
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+              child: Container(
+                height: 75,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: Colors.white.withOpacity(0.5)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.pink.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildNavItem(0, Icons.home_rounded, 'Home'),
+                    _buildNavItem(1, Icons.assignment_rounded, 'Relatos'),
+                    _buildNavItem(2, Icons.people_rounded, 'Contatos'),
+                  ],
+                ),
               ),
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    bool selected = _indice == index;
+    return GestureDetector(
+      onTap: () => setState(() => _indice = index),
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Icon(
+              icon,
+              color: selected ? AppColors.primary : Colors.grey.shade400,
+              size: 28,
+            ),
+          ),
+          if (selected)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              width: 4,
+              height: 4,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+            ),
+        ],
       ),
     );
   }

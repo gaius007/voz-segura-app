@@ -5,17 +5,15 @@ class ReportModel {
   final String id;
   final String description;
   final DateTime createdAt;
-  final List<String> photoPaths;
+  final List<String> photoUrls;
   final String contentHash;
-  final bool isSynced;
 
   const ReportModel({
     required this.id,
     required this.description,
     required this.createdAt,
-    required this.photoPaths,
+    required this.photoUrls,
     required this.contentHash,
-    this.isSynced = false,
   });
 
   factory ReportModel.fromEntity(Report entity) {
@@ -23,9 +21,8 @@ class ReportModel {
       id: entity.id,
       description: entity.description,
       createdAt: entity.createdAt,
-      photoPaths: entity.photoPaths,
+      photoUrls: entity.photoUrls,
       contentHash: entity.contentHash,
-      isSynced: entity.isSynced,
     );
   }
 
@@ -34,9 +31,8 @@ class ReportModel {
       id: id,
       description: description,
       createdAt: createdAt,
-      photoPaths: photoPaths,
+      photoUrls: photoUrls,
       contentHash: contentHash,
-      isSynced: isSynced,
     );
   }
 
@@ -45,9 +41,8 @@ class ReportModel {
       'id': id,
       'description': description,
       'createdAt': createdAt.toIso8601String(),
-      'photoPaths': jsonEncode(photoPaths),
+      'photoUrls': jsonEncode(photoUrls),
       'contentHash': contentHash,
-      'isSynced': isSynced ? 1 : 0,
     };
   }
 
@@ -56,9 +51,8 @@ class ReportModel {
       id: map['id'] as String,
       description: map['description'] as String,
       createdAt: DateTime.parse(map['createdAt'] as String),
-      photoPaths: List<String>.from(jsonDecode(map['photoPaths'] as String)),
+      photoUrls: List<String>.from(jsonDecode(map['photoUrls'] as String)),
       contentHash: map['contentHash'] as String,
-      isSynced: (map['isSynced'] as int) == 1,
     );
   }
 }
