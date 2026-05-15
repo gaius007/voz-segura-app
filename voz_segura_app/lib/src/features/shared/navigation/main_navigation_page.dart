@@ -4,6 +4,7 @@ import '../../reports/presentation/pages/report_list_page.dart';
 import '../../reports/presentation/pages/report_create_page.dart';
 import '../../sos/presentation/home_page.dart';
 import '../../contacts/presentation/emergency_contacts_page.dart';
+import '../../settings/presentation/settings_page.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 
 class MainNavigationPage extends StatefulWidget {
@@ -20,6 +21,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     const HomePage(),
     const ReportListPage(),
     const EmergencyContactsPage(),
+    const SettingsPage(),
   ];
 
   @override
@@ -102,6 +104,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                     _buildNavItem(0, Icons.home_rounded, 'Home'),
                     _buildNavItem(1, Icons.assignment_rounded, 'Relatos'),
                     _buildNavItem(2, Icons.people_rounded, 'Contatos'),
+                    _buildNavItem(3, Icons.settings_rounded, 'Ajustes'),
                   ],
                 ),
               ),

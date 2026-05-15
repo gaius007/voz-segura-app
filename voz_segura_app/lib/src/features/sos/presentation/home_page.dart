@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'sos_notifier.dart';
 import 'widgets/secure_sos_button.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
+import 'package:voz_segura_app/src/features/shared/camouflage/camouflage_notifier.dart';
+import 'package:voz_segura_app/src/features/shared/camouflage/camouflage_dialog.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -39,6 +41,21 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       appBar: AppBar(
         title: const Text('VOZ SEGURA'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.visibility_off_outlined),
+            tooltip: 'Modo Camuflagem',
+            onPressed: () {
+              final camNotifier = context.read<CamouflageNotifier>();
+              if (camNotifier.showExplanation) {
+                showDialog(
+                  context: context,
+                  builder: (context) => const CamouflageDialog(),
+                );
+              } else {
+                camNotifier.setCamouflaged(true);
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.power_settings_new_rounded),
             onPressed: () => sosNotifier.logout(),

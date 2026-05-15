@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'src/features/auth/data/auth_repository.dart';
 import 'src/features/auth/domain/app_user.dart';
@@ -13,6 +14,8 @@ import 'src/features/reports/presentation/manager/report_notifier.dart';
 import 'src/features/sos/presentation/sos_notifier.dart';
 import 'src/features/shared/navigation/main_navigation_page.dart';
 import 'src/core/theme/app_theme.dart';
+import 'src/features/shared/camouflage/camouflage_notifier.dart';
+import 'src/features/shared/camouflage/camouflage_view.dart';
 
 const firebaseConfig = FirebaseOptions(
   apiKey: "AIzaSyAv46EF0QnhCbF83aRuvSzmezfUikmPToU",
@@ -27,7 +30,16 @@ const firebaseConfig = FirebaseOptions(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: firebaseConfig);
-  runApp(const VozSeguraApp());
+  final prefs = await SharedPreferences.getInstance();
+  
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => CamouflageNotifier(prefs)),
+      ],
+      child: const VozSeguraApp(),
+    ),
+  );
 }
 
 class VozSeguraApp extends StatelessWidget {
@@ -79,6 +91,11 @@ class AuthWrapper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authRepo = context.watch<AuthRepository>();
+    final isCamouflaged = context.watch<CamouflageNotifier>().isCamouflaged;
+
+    if (isCamouflaged) {
+      return const CamouflageView();
+    }
     
     return StreamBuilder<AppUser?>(
       stream: authRepo.authStateChanges(),
