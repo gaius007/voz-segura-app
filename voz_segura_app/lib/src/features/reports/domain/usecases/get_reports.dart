@@ -7,8 +7,8 @@ class GetReports {
 
   GetReports(this.repository);
 
-  Future<List<Report>> execute() async {
+  Future<List<Report>> execute({int? limit, DateTime? startAfter}) async {
     // So chama o repositorio msm, bem de boa
-    return await repository.getReports();
+    return await repository.getReports(limit: limit, startAfter: startAfter);
   }
 }

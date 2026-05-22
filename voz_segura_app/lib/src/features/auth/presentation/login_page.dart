@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../data/auth_repository.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
+import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -157,7 +158,14 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: 32),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RegisterPage(),
+                          ),
+                        );
+                      },
                       child: Text(
                         'Primeira vez aqui? Crie uma conta',
                         style: TextStyle(color: AppColors.ruby.withOpacity(0.7), fontWeight: FontWeight.w600),

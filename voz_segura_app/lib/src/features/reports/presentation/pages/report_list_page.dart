@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../manager/report_notifier.dart';
@@ -13,6 +12,7 @@ class ReportListPage extends StatefulWidget {
 }
 
 class _ReportListPageState extends State<ReportListPage> {
+  final ScrollController _scrollController = ScrollController();
   
   @override
   void initState() {
@@ -20,6 +20,21 @@ class _ReportListPageState extends State<ReportListPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ReportNotifier>().carregarRelatos();
     });
+    _scrollController.addListener(_scrollListener);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollListener() {
+    final notifier = context.read<ReportNotifier>();
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      notifier.carregarMaisRelatos();
+    }
   }
 
   @override
@@ -42,12 +57,25 @@ class _ReportListPageState extends State<ReportListPage> {
                   child: notifier.reports.isEmpty
                       ? _buildVazio()
                       : ListView.builder(
+                          controller: _scrollController,
                           padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
-                          itemCount: notifier.reports.length,
+                          itemCount: notifier.reports.length + (notifier.hasMore ? 1 : 0),
                           itemBuilder: (context, index) {
+                            if (index == notifier.reports.length) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24),
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                  ),
+                                ),
+                              );
+                            }
+
                             final report = notifier.reports[index];
                             return TweenAnimationBuilder(
-                              duration: Duration(milliseconds: 400 + (index * 100)),
+                              duration: Duration(milliseconds: 300 + (index < 5 ? index * 100 : 0)),
                               curve: Curves.easeOutCubic,
                               tween: Tween<double>(begin: 0, end: 1),
                               builder: (context, value, child) {

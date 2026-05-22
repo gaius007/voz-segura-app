@@ -41,18 +41,43 @@ class AuthRepository {
   }
 
   // Funcao pra criar conta
-  Future<AppUser?> signUp(String email, String password) async {
+  Future<AppUser?> signUp(String email, String password, {String? displayName}) async {
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email, 
       password: password,
     );
     final user = credential.user;
     if (user == null) return null;
-    return AppUser(uid: user.uid, email: user.email ?? '');
+    if (displayName != null && displayName.isNotEmpty) {
+      await user.updateDisplayName(displayName);
+      await user.reload(); // Força o reload do cache local do Firebase Auth
+    }
+    final refreshedUser = _auth.currentUser ?? user;
+    return AppUser(
+      uid: refreshedUser.uid, 
+      email: refreshedUser.email ?? '',
+      displayName: displayName ?? refreshedUser.displayName,
+    );
   }
 
   // Sair do app
   Future<void> signOut() {
     return _auth.signOut();
   }
+
+  // Recarrega os dados do usuario do servidor para atualizar o cache local (ex: displayName)
+  Future<void> reload() async {
+    await _auth.currentUser?.reload();
+  }
+
+  // Atualiza o nome do usuario logado no Firebase Auth e recarrega
+  Future<void> updateDisplayName(String name) async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      await user.updateDisplayName(name);
+      await user.reload();
+    }
+  }
 }
+
+

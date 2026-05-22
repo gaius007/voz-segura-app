@@ -23,6 +23,7 @@ class _RegisterPageState extends State<RegisterPage> {
       await context.read<AuthRepository>().signUp(
         _emailController.text,
         _passwordController.text,
+        displayName: _nameController.text,
       );
       if (mounted) Navigator.pop(context); // volta pro login se deu certo
     } catch (e) {

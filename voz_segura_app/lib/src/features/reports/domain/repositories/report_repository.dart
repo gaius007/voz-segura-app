@@ -5,5 +5,7 @@ import '../entities/report.dart';
 // Ai se um dia quiser mudar o banco pra Firebase eh so criar outra implementacao
 abstract class ReportRepository {
   Future<void> createReport(Report report);
-  Future<List<Report>> getReports();
+  Future<List<Report>> getReports({int? limit, DateTime? startAfter});
+  Future<void> updateReport(Report report);
+  Future<void> deleteReport(String id);
 }

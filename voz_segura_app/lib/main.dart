@@ -10,6 +10,8 @@ import 'src/features/contacts/data/contact_repository.dart';
 import 'src/features/reports/data/repositories/report_repository_impl.dart';
 import 'src/features/reports/domain/usecases/create_report.dart';
 import 'src/features/reports/domain/usecases/get_reports.dart';
+import 'src/features/reports/domain/usecases/update_report.dart';
+import 'src/features/reports/domain/usecases/delete_report.dart';
 import 'src/features/reports/presentation/manager/report_notifier.dart';
 import 'src/features/sos/presentation/sos_notifier.dart';
 import 'src/features/shared/navigation/main_navigation_page.dart';
@@ -59,6 +61,12 @@ class VozSeguraApp extends StatelessWidget {
         ProxyProvider<ReportRepositoryImpl, GetReports>(
           update: (_, repo, __) => GetReports(repo),
         ),
+        ProxyProvider<ReportRepositoryImpl, UpdateReport>(
+          update: (_, repo, __) => UpdateReport(repo),
+        ),
+        ProxyProvider<ReportRepositoryImpl, DeleteReport>(
+          update: (_, repo, __) => DeleteReport(repo),
+        ),
         
         ChangeNotifierProxyProvider2<AuthRepository, ContactRepository, SOSNotifier>(
           create: (context) => SOSNotifier(
@@ -67,12 +75,13 @@ class VozSeguraApp extends StatelessWidget {
           ),
           update: (_, auth, contacts, sos) => sos!,
         ),
-        ChangeNotifierProxyProvider2<CreateReport, GetReports, ReportNotifier>(
+        ChangeNotifierProvider<ReportNotifier>(
           create: (context) => ReportNotifier(
             createReportUseCase: context.read<CreateReport>(),
             getReportsUseCase: context.read<GetReports>(),
+            updateReportUseCase: context.read<UpdateReport>(),
+            deleteReportUseCase: context.read<DeleteReport>(),
           ),
-          update: (_, create, get, notifier) => notifier!,
         ),
       ],
       child: MaterialApp(

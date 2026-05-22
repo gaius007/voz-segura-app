@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../sos_notifier.dart';
@@ -184,7 +183,7 @@ class _SecureSOSButtonState extends State<SecureSOSButton> with SingleTickerProv
       key: const ValueKey('sos'),
       color: Colors.transparent,
       child: InkWell(
-        onTap: sos.isSending ? null : () => sos.sendSOSAlert(),
+        onTap: sos.isSending ? null : () => sos.sendSOSAlert(context),
         borderRadius: BorderRadius.circular(size),
         child: Container(
           width: size * 0.8,

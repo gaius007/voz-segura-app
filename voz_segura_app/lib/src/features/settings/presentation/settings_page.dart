@@ -14,17 +14,30 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   late TextEditingController _wordController;
+  late TextEditingController _nameController;
 
   @override
   void initState() {
     super.initState();
     final notifier = context.read<CamouflageNotifier>();
     _wordController = TextEditingController(text: notifier.secretWord);
+    _nameController = TextEditingController();
+
+    // Recarrega o usuario em segundo plano para obter o displayName mais recente
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await context.read<AuthRepository>().reload();
+        if (mounted) setState(() {});
+      } catch (e) {
+        debugPrint('VS: Erro ao recarregar usuario nas configuracoes: $e');
+      }
+    });
   }
 
   @override
   void dispose() {
     _wordController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
@@ -51,6 +64,12 @@ class _SettingsPageState extends State<SettingsPage> {
             _buildSectionHeader('Minha Conta', Icons.person_outline),
             const SizedBox(height: 16),
             _buildInfoCard([
+              _buildEditRow(
+                'Nome Completo',
+                user?.displayName ?? 'Usuária Voz Segura',
+                () => _showEditNameDialog(context, authRepo),
+              ),
+              const Divider(height: 24, color: AppColors.sakura),
               _buildInfoRow('Email', user?.email ?? 'Não informado'),
               const Divider(height: 24, color: AppColors.sakura),
               _buildInfoRow('ID do Usuário', user?.uid ?? '---'),
@@ -214,6 +233,128 @@ class _SettingsPageState extends State<SettingsPage> {
             child: const Text('Salvar', style: TextStyle(color: Colors.white)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showEditNameDialog(BuildContext context, AuthRepository authRepo) {
+    _nameController.text = authRepo.currentUser?.displayName ?? '';
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text(
+              'Alterar Nome Completo',
+              style: TextStyle(color: AppColors.textMain, fontWeight: FontWeight.bold),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Este nome será exibido nos seus relatos públicos para a comunidade.',
+                  style: TextStyle(fontSize: 13, color: AppColors.rose),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _nameController,
+                  cursorColor: AppColors.ruby,
+                  style: const TextStyle(color: AppColors.textMain),
+                  decoration: const InputDecoration(
+                    labelText: 'Nome Completo',
+                    labelStyle: TextStyle(color: AppColors.rose),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: AppColors.ruby),
+                    ),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: AppColors.sakura),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isLoading ? null : () => Navigator.pop(context),
+                child: const Text('Cancelar', style: TextStyle(color: AppColors.rose)),
+              ),
+              isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.ruby),
+                        ),
+                      ),
+                    )
+                  : ElevatedButton(
+                      onPressed: () async {
+                        final newName = _nameController.text.trim();
+                        if (newName.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('O nome não pode ser vazio.'),
+                              backgroundColor: AppColors.ruby,
+                            ),
+                          );
+                          return;
+                        }
+                        
+                        setDialogState(() {
+                          isLoading = true;
+                        });
+
+                        try {
+                          await authRepo.updateDisplayName(newName);
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Nome atualizado com sucesso!'),
+                                backgroundColor: AppColors.primary,
+                              ),
+                            );
+                            setState(() {}); // Recarrega tela de configurações com novo nome
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Erro ao atualizar nome: $e'),
+                                backgroundColor: AppColors.ruby,
+                              ),
+                            );
+                          }
+                        } finally {
+                          if (context.mounted) {
+                            setDialogState(() {
+                              isLoading = false;
+                            });
+                          }
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.ruby,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                      child: const Text('Salvar', style: TextStyle(color: Colors.white)),
+                    ),
+            ],
+          );
+        },
       ),
     );
   }

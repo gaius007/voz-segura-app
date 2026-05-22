@@ -105,17 +105,79 @@ class ReportCard extends StatelessWidget {
                             ),
                           ],
                         ),
+                        if (report.visibility == ReportVisibility.public) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(Icons.person_outline_rounded, size: 12, color: AppColors.rose),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  'Autora: ${report.authorName ?? "Usuária Voz Segura"}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.ruby,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.sakura,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            "PROTOCOLO SEGURO",
-                            style: TextStyle(color: AppColors.ruby, fontSize: 9, fontWeight: FontWeight.bold),
-                          ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.sakura,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                "PROTOCOLO SEGURO",
+                                style: TextStyle(color: AppColors.ruby, fontSize: 9, fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: report.visibility == ReportVisibility.public
+                                    ? const Color(0xFFE3F2FD)
+                                    : const Color(0xFFECEFF1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    report.visibility == ReportVisibility.public
+                                        ? Icons.public_rounded
+                                        : Icons.lock_rounded,
+                                    size: 10,
+                                    color: report.visibility == ReportVisibility.public
+                                        ? Colors.blue.shade700
+                                        : Colors.blueGrey.shade700,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    report.visibility == ReportVisibility.public
+                                        ? "PÚBLICO"
+                                        : "PRIVADO",
+                                    style: TextStyle(
+                                      color: report.visibility == ReportVisibility.public
+                                          ? Colors.blue.shade700
+                                          : Colors.blueGrey.shade700,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
