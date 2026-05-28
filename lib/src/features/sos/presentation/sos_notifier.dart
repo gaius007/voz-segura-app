@@ -1,5 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../contacts/data/contact_repository.dart';
@@ -10,6 +14,13 @@ import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 class SOSNotifier extends ChangeNotifier {
   final AuthRepository authRepository;
   final ContactRepository contactRepository;
+
+  static const smsChannel = MethodChannel('com.example.voz_segura_app/sms');
+
+  // Configuração da API Brevo para envio automático de e-mail em background
+  static const String _brevoApiKey = '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';
+  static const String _brevoSenderEmail = 'c.oliveirap2005@gmail.com';
+  static const String _brevoSenderName = 'Voz Segura SOS';
   
   bool _isSOSActive = false;
   bool get isSOSActive => _isSOSActive;
@@ -59,18 +70,22 @@ class SOSNotifier extends ChangeNotifier {
       _statusMessage = "Enviando mensagens...";
       notifyListeners();
 
-      // 3. Dispara SMS, WhatsApp e E-mails
+      // 3. Dispara SMS, WhatsApp e E-mails de forma assíncrona concorrente (paralela)
+      final List<Future<void>> sendFutures = [];
       for (var contact in contacts) {
         for (var method in contact.methods) {
           if (method.type == 'WhatsApp') {
-            await _sendWhatsApp(method.value, mapLink);
+            sendFutures.add(_sendWhatsApp(method.value, mapLink));
           } else if (method.type == 'Telefone') {
-            await _sendSMS(method.value, mapLink);
+            sendFutures.add(_sendSMS(method.value, mapLink));
           } else if (method.type == 'E-mail') {
-            await _sendEmail(method.value, mapLink);
+            sendFutures.add(_sendEmail(method.value, mapLink));
           }
         }
       }
+
+      // Aguarda a execução em paralelo de todos os canais de disparo assíncronos
+      await Future.wait(sendFutures);
 
       _statusMessage = "SOS enviado com sucesso! 🎉";
     } catch (e) {
@@ -143,42 +158,147 @@ class SOSNotifier extends ChangeNotifier {
     }
   }
 
-  // Abre o app de SMS do celular
+  // Envia SMS de forma silenciosa via MethodChannel ou fallback manual via url_launcher
   Future<void> _sendSMS(String phone, String link) async {
-    final Uri smsUri = Uri.parse("sms:$phone?body=ESTOU EM PERIGO! Minha localização: $link");
+    String cleanPhone = phone.replaceAll(RegExp(r'[\s\(\)\-\+]'), '');
+
+    // Garantir DDI do Brasil se o número tiver apenas DDD + telefone
+    if ((cleanPhone.length == 10 || cleanPhone.length == 11) && !cleanPhone.startsWith('55')) {
+      cleanPhone = '55$cleanPhone';
+    }
+
+    bool sentSilently = false;
+
     try {
-      if (await canLaunchUrl(smsUri)) {
-        await launchUrl(smsUri);
-      } else {
-        throw "Sem app de SMS";
+      // Solicita a permissão de SMS em tempo de execução
+      final status = await Permission.sms.status;
+      if (!status.isGranted) {
+        final requestStatus = await Permission.sms.request();
+        if (!requestStatus.isGranted) {
+          throw "Permissão de SMS negada pela usuária.";
+        }
       }
+
+      // Dispara o SMS silencioso usando a MethodChannel nativa
+      debugPrint("Enviando SMS silencioso via MethodChannel para $cleanPhone...");
+      final result = await smsChannel.invokeMethod('sendSMS', {
+        'phone': cleanPhone,
+        'message': 'ESTOU EM PERIGO! Minha localização atual: $link',
+      });
+      debugPrint("SMS Nativo enviado com sucesso: $result");
+      sentSilently = true;
     } catch (e) {
-      debugPrint("Nao deu pra abrir SMS: $e");
-      _statusMessage = "Erro: Seu sistema não tem App de SMS instalado.";
-      notifyListeners();
+      debugPrint("Falha no SMS silencioso nativo: $e. Ativando fallback manual...");
+    }
+
+    if (!sentSilently) {
+      final Uri smsUri = Uri(
+        scheme: 'sms',
+        path: cleanPhone,
+        queryParameters: {
+          'body': 'ESTOU EM PERIGO! Minha localização atual: $link',
+        },
+      );
+      try {
+        // Tentamos abrir em modo externalApplication primeiro para máxima compatibilidade no Android/iOS
+        await launchUrl(smsUri, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        debugPrint("Não foi possível abrir SMS no modo external: $e. Tentando modo padrão...");
+        try {
+          await launchUrl(smsUri);
+        } catch (err) {
+          debugPrint("Falha total ao abrir app de SMS: $err");
+          _statusMessage = "Erro: Seu sistema não conseguiu abrir o App de SMS.";
+          notifyListeners();
+        }
+      }
     }
   }
 
-  // Abre o app de E-mail
-  Future<void> _sendEmail(String email, String link) async {
-    final Uri emailUri = Uri(
-      scheme: 'mailto',
-      path: email,
-      queryParameters: {
-        'subject': 'ALERTA DE EMERGÊNCIA - VOZ SEGURA',
-        'body': 'ESTOU EM PERIGO!\n\nMinha localização atual: $link',
-      },
-    );
+  // Envia E-mail silencioso em segundo plano usando a API v3 da Brevo
+  Future<bool> _sendBrevoEmail(String email, String link) async {
+    if (_brevoApiKey.isEmpty || _brevoApiKey.startsWith('SUA_')) {
+      debugPrint("Brevo API Key não configurada ou inválida.");
+      return false;
+    }
+
     try {
-      if (await canLaunchUrl(emailUri)) {
-        await launchUrl(emailUri);
+      final response = await http.post(
+        Uri.parse('https://api.brevo.com/v3/smtp/email'),
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': _brevoApiKey,
+        },
+        body: jsonEncode({
+          "sender": {"email": _brevoSenderEmail, "name": _brevoSenderName},
+          "to": [{"email": email}],
+          "subject": "ALERTA DE EMERGÊNCIA - VOZ SEGURA",
+          "htmlContent": """
+            <div style="font-family: sans-serif; padding: 20px; border: 2px solid #E01A4F; border-radius: 10px; max-width: 600px;">
+              <h1 style="color: #E01A4F; font-size: 24px; margin-top: 0;">ALERTA DE EMERGÊNCIA - VOZ SEGURA</h1>
+              <p style="font-size: 16px; color: #1F1F21; line-height: 1.5;">
+                A usuária enviou um sinal de socorro emergencial através do aplicativo <strong>Voz Segura</strong>.
+              </p>
+              <div style="background-color: #F8F9FA; border-left: 4px solid #E01A4F; padding: 15px; margin: 20px 0;">
+                <p style="margin: 0; font-weight: bold; color: #E01A4F;">ESTOU EM PERIGO!</p>
+                <p style="margin: 10px 0 0 0; font-size: 15px;">
+                  Minha localização geográfica atual e tempo real no mapa:
+                </p>
+                <p style="margin: 10px 0 0 0;">
+                  <a href="$link" style="color: #007bff; text-decoration: underline; font-weight: bold;">Ver Localização no Google Maps</a>
+                </p>
+              </div>
+              <p style="font-size: 12px; color: #6C757D; margin-bottom: 0;">
+                Este e-mail foi gerado e enviado de forma automática e silenciosa pelo aplicativo Voz Segura para contatos de confiança cadastrados.
+              </p>
+            </div>
+          """,
+        }),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 202) {
+        debugPrint("E-mail enviado com sucesso via Brevo REST API!");
+        return true;
       } else {
-        throw "Sem app de E-mail";
+        debugPrint("Erro Brevo API: ${response.statusCode} - ${response.body}");
+        return false;
       }
     } catch (e) {
-      debugPrint("Nao deu pra abrir Email: $e");
-      _statusMessage = "Erro: Seu sistema não tem App de E-mail instalado.";
-      notifyListeners();
+      debugPrint("Exceção ao disparar e-mail via Brevo: $e");
+      return false;
+    }
+  }
+
+  // Envia e-mail de forma automática via Brevo REST API ou fallback manual via url_launcher
+  Future<void> _sendEmail(String email, String link) async {
+    bool sentAutomatically = false;
+
+    // Tenta o envio automático via Brevo primeiro
+    sentAutomatically = await _sendBrevoEmail(email, link);
+
+    if (!sentAutomatically) {
+      debugPrint("Falha no e-mail automático Brevo. Ativando fallback manual (mailto:)...");
+      final Uri emailUri = Uri(
+        scheme: 'mailto',
+        path: email,
+        queryParameters: {
+          'subject': 'ALERTA DE EMERGÊNCIA - VOZ SEGURA',
+          'body': 'ESTOU EM PERIGO!\n\nMinha localização atual: $link',
+        },
+      );
+      try {
+        // Tentamos abrir em modo externalApplication para garantir o disparo
+        await launchUrl(emailUri, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        debugPrint("Não foi possível abrir E-mail no modo external: $e. Tentando modo padrão...");
+        try {
+          await launchUrl(emailUri);
+        } catch (err) {
+          debugPrint("Falha total ao abrir app de E-mail: $err");
+          _statusMessage = "Erro: Seu sistema não conseguiu abrir o App de E-mail.";
+          notifyListeners();
+        }
+      }
     }
   }
 
