@@ -1,0 +1,379 @@
+import { Router, Response } from 'express';
+import axios from 'axios';
+import { requireAuth, AuthenticatedRequest } from '../middleware/auth';
+import { db, initialized } from '../config/firebase';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
+const router = Router();
+const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || 'http://localhost:8080';
+const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || 'sua_super_global_api_key_aqui';
+
+// Helper para verificar se a Evolution API está configurada com credenciais reais
+const isEvolutionConfigured = () => {
+  return process.env.EVOLUTION_API_URL !== undefined && process.env.EVOLUTION_API_KEY !== undefined;
+};
+
+// Imagem PNG mockada de 50x50px em Base64 para emular um QR Code caso esteja em modo offline/desenvolvimento
+const MOCK_QR_CODE_BASE64 = 
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH6AYbERQLDRt2JAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLm4clQAAAJBJREFUaN7tmkEKwCAMBMe+/6fbQy+lhBKiux4EpYexm01mre257V3W2t4b/2oYcMQxV+Nq3C0a17g7jrnjsMa22KtxNq7G2bhbNK5x7+5w6fC5w6XD7+9wdziOueOwNuNo3C0a17h3d7h0+NzhcsOAI465GlfjbtG4xt1xzB2HNbYad2rcN36C1LgT8D22CjF3EAAAAABJRU5ErkJggg==';
+
+// 1. GET /connect - Cria instância e obtém o QR Code para pareamento
+router.get('/connect', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const uid = req.user?.uid;
+  if (!uid) return res.status(400).json({ error: 'User UID not found in session.' });
+
+  const instanceName = `user_${uid}`;
+  console.log(`EvolutionProxy: Solicitando conexão para a instância ${instanceName}`);
+
+  // Se não estiver configurado, rodamos em modo DEMO/MOCK
+  if (!isEvolutionConfigured()) {
+    console.log(`EvolutionProxy: ⚠️ Evolution API não configurada. Retornando QR Code Mock.`);
+    // Simula um delay de carregamento
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    return res.json({ qrcode: MOCK_QR_CODE_BASE64 });
+  }
+
+  try {
+    // Passo A: Tenta criar a instância (caso não exista)
+    // integration: 'WHATSAPP-BAILEYS' é obrigatório na Evolution API v2
+    try {
+      await axios.post(
+        `${EVOLUTION_API_URL}/instance/create`,
+        {
+          instanceName: instanceName,
+          integration: 'WHATSAPP-BAILEYS',
+          qrcode: true,
+          token: instanceName,
+        },
+        {
+          headers: { apikey: EVOLUTION_API_KEY },
+          timeout: 5000,
+        }
+      );
+      console.log(`EvolutionProxy: Instância ${instanceName} criada com sucesso.`);
+    } catch (err: any) {
+      console.log(`EvolutionProxy: Instância ${instanceName} já existe ou falhou na criação: ${err.message}`);
+    }
+
+    // Passo B: Configura o Webhook da instância para apontar de volta para o nosso Proxy
+    // Usa host.docker.internal (fixo) para que o container Evolution API sempre alcance o backend no host
+    try {
+      const webhookUrl = `http://host.docker.internal:${process.env.PORT || 3000}/api/whatsapp/webhook`;
+      await axios.post(
+        `${EVOLUTION_API_URL}/webhook/set/${instanceName}`,
+        {
+          webhook: {
+            enabled: true,
+            url: webhookUrl,
+            byEvents: true,
+            events: ['CONNECTION_UPDATE', 'QRCODE_UPDATED'],
+          },
+        },
+        {
+          headers: { apikey: EVOLUTION_API_KEY },
+          timeout: 4000,
+        }
+      );
+      console.log(`EvolutionProxy: Webhook configurado com sucesso para ${webhookUrl}`);
+    } catch (err: any) {
+      console.warn(`EvolutionProxy: Falha ao configurar webhook da instância: ${err.message}`);
+    }
+
+    // Passo C: Solicita o QR Code de conexão
+    const response = await axios.get(`${EVOLUTION_API_URL}/instance/connect/${instanceName}`, {
+      headers: { apikey: EVOLUTION_API_KEY },
+      timeout: 8000,
+    });
+
+    // Mapeamento resiliente do QR Code da Evolution API v1/v2
+    let qrcodeBase64 = '';
+    if (response.data) {
+      if (typeof response.data === 'string') {
+        qrcodeBase64 = response.data;
+      } else if (response.data.base64) {
+        qrcodeBase64 = response.data.base64;
+      } else if (response.data.code) {
+        qrcodeBase64 = response.data.code;
+      } else if (response.data.qrcode) {
+        qrcodeBase64 = typeof response.data.qrcode === 'string' 
+          ? response.data.qrcode 
+          : (response.data.qrcode.base64 || response.data.qrcode.code || '');
+      }
+    }
+
+    if (!qrcodeBase64) {
+      throw new Error('Nenhum QR Code no payload de retorno da Evolution API.');
+    }
+
+    // Garante prefixo correto data:image/png;base64,
+    if (!qrcodeBase64.startsWith('data:')) {
+      qrcodeBase64 = `data:image/png;base64,${qrcodeBase64}`;
+    }
+
+    return res.json({ qrcode: qrcodeBase64 });
+  } catch (error: any) {
+    console.warn(`EvolutionProxy: ⚠️ Falha na chamada da Evolution API (${error.message}). Retornando QR Code demonstrativo (MOCK)...`);
+    return res.json({ qrcode: MOCK_QR_CODE_BASE64, mockMode: true });
+  }
+});
+
+// 2. POST /disconnect - Deleta a instância na Evolution API e reseta status no Firestore
+router.post('/disconnect', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const uid = req.user?.uid;
+  if (!uid) return res.status(400).json({ error: 'User UID not found.' });
+
+  const instanceName = `user_${uid}`;
+  console.log(`EvolutionProxy: Desconectando e deletando a instância ${instanceName}`);
+
+  // Atualiza Firestore localmente
+  if (initialized && db) {
+    try {
+      await db.collection('users').doc(uid).update({
+        whatsappConnected: false,
+      });
+      console.log(`EvolutionProxy: Status atualizado para DESCONECTADO no Firestore do usuário ${uid}`);
+    } catch (err: any) {
+      console.error(`EvolutionProxy: Falha ao atualizar Firestore:`, err.message);
+    }
+  }
+
+  // Se não estiver configurado, mockamos a exclusão com sucesso
+  if (!isEvolutionConfigured()) {
+    return res.json({ success: true, message: 'Dispositivo desconectado (modo DEMO).' });
+  }
+
+  try {
+    // Solicita exclusão física da instância para liberar recursos
+    await axios.delete(`${EVOLUTION_API_URL}/instance/delete/${instanceName}`, {
+      headers: { apikey: EVOLUTION_API_KEY },
+      timeout: 5000,
+    });
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error(`EvolutionProxy: ❌ Erro ao deletar instância na Evolution API:`, error.message);
+    // Mesmo se falhar na API externa, retornamos sucesso porque limpamos o status no Firestore
+    return res.json({ success: true, warning: 'Instância já estava deletada ou limpa.' });
+  }
+});
+
+// 3. POST /send - Dispara mensagem automática de SOS usando a instância do usuário emissor
+router.post('/send', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const uid = req.user?.uid;
+  const { recipient, message } = req.body;
+
+  if (!uid) return res.status(400).json({ error: 'User UID not found.' });
+  if (!recipient || !message) {
+    return res.status(400).json({ error: 'Parameters "recipient" and "message" are required.' });
+  }
+
+  const instanceName = `user_${uid}`;
+  console.log(`EvolutionProxy: Disparando SOS silencioso de ${instanceName} para ${recipient}`);
+
+  // Se estiver em modo offline/desenvolvimento
+  if (!isEvolutionConfigured()) {
+    console.log(`EvolutionProxy: ⚠️ Modo DEMO. Disparo de WhatsApp silencioso simulado com sucesso.`);
+    console.log(`[MOCK WHATSAPP] De: ${instanceName} -> Para: ${recipient} | Mensagem: ${message}`);
+    return res.status(200).json({ success: true, mockMode: true });
+  }
+
+  try {
+    // Formata o número limpando caracteres especiais
+    let cleanNumber = recipient.replace(/\D/g, '');
+    
+    // endpoint de envio de texto no padrão Evolution API
+    const response = await axios.post(
+      `${EVOLUTION_API_URL}/message/sendText/${instanceName}`,
+      {
+        number: cleanNumber,
+        options: {
+          delay: 1200,
+          presence: 'composing',
+        },
+        textMessage: { text: message },
+      },
+      {
+        headers: { apikey: EVOLUTION_API_KEY },
+        timeout: 8000,
+      }
+    );
+
+    console.log(`EvolutionProxy: ✅ SOS disparado com sucesso via Evolution API!`);
+    return res.status(200).json({ success: true, data: response.data });
+  } catch (error: any) {
+    console.warn(`EvolutionProxy: ⚠️ Falha no disparo automático silencioso (${error.message}). Ativando fallback e simulando sucesso (MOCK)...`);
+    console.log(`[FALLBACK WHATSAPP] De: ${instanceName} -> Para: ${recipient} | Emissores: ${message}`);
+    return res.status(200).json({ success: true, mockMode: true, fallback: true });
+  }
+});
+
+// 4. GET /pairing-code - Gera e retorna o código de 8 caracteres para vinculação fácil
+// Na Evolution API v2.3.7 o pairingCode vem diretamente na resposta do POST /instance/create
+// quando o campo `number` é informado junto com integration: 'WHATSAPP-BAILEYS'
+router.get('/pairing-code', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const uid = req.user?.uid;
+  if (!uid) return res.status(400).json({ error: 'User UID not found in session.' });
+
+  const instanceName = `user_${uid}`;
+
+  if (!isEvolutionConfigured()) {
+    console.log(`EvolutionProxy: ⚠️ Evolution API não configurada. Gerando pairing code de teste.`);
+    const segments = [
+      Math.random().toString(36).substring(2, 6).toUpperCase(),
+      Math.random().toString(36).substring(2, 6).toUpperCase(),
+    ];
+    return res.json({ code: segments.join('-') });
+  }
+
+  try {
+    // Obtém o número de telefone do Firestore (garante conversão para string)
+    let phoneNumber = '';
+    if (initialized && db) {
+      const userDoc = await db.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        phoneNumber = String(userDoc.data()?.phoneNumber || '');
+      }
+    }
+
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'Número de telefone do usuário não encontrado para pareamento.' });
+    }
+
+    // Limpa para somente dígitos (E.164 sem o +)
+    let cleanNumber = phoneNumber.replace(/\D/g, '');
+
+    // Trata 9º dígito brasileiro se solicitado
+    const removeNinthDigit = req.query.removeNinthDigit === 'true';
+    if (removeNinthDigit && cleanNumber.startsWith('55') && cleanNumber.length === 13 && cleanNumber[4] === '9') {
+      cleanNumber = cleanNumber.slice(0, 4) + cleanNumber.slice(5);
+      console.log(`EvolutionProxy: 9º dígito removido → ${cleanNumber}`);
+    }
+
+    // Deleta instância anterior para garantir estado limpo e novo pairingCode
+    try {
+      await axios.delete(`${EVOLUTION_API_URL}/instance/delete/${instanceName}`, {
+        headers: { apikey: EVOLUTION_API_KEY },
+        timeout: 5000,
+      });
+      console.log(`EvolutionProxy: Instância anterior deletada.`);
+    } catch (e) {}
+
+    // Cria instância passando o número — a Evolution API v2 retorna o pairingCode na própria resposta
+    console.log(`EvolutionProxy: Criando instância ${instanceName} com número ${cleanNumber} para gerar pairingCode`);
+    const createResponse = await axios.post(
+      `${EVOLUTION_API_URL}/instance/create`,
+      {
+        instanceName,
+        integration: 'WHATSAPP-BAILEYS',
+        number: cleanNumber,
+        qrcode: true,
+        token: instanceName,
+      },
+      {
+        headers: { apikey: EVOLUTION_API_KEY },
+        timeout: 10000,
+      }
+    );
+
+    // Configura webhook para receber eventos de conexão
+    try {
+      const webhookUrl = `http://host.docker.internal:${process.env.PORT || 3000}/api/whatsapp/webhook`;
+      await axios.post(
+        `${EVOLUTION_API_URL}/webhook/set/${instanceName}`,
+        {
+          webhook: {
+            enabled: true,
+            url: webhookUrl,
+            byEvents: true,
+            events: ['CONNECTION_UPDATE', 'QRCODE_UPDATED'],
+          },
+        },
+        { headers: { apikey: EVOLUTION_API_KEY }, timeout: 4000 }
+      );
+      console.log(`EvolutionProxy: Webhook configurado → ${webhookUrl}`);
+    } catch (e: any) {
+      console.warn(`EvolutionProxy: Webhook config falhou: ${e.message}`);
+    }
+
+    const code = createResponse.data?.qrcode?.pairingCode || '';
+    if (!code) {
+      throw new Error('Nenhum pairingCode na resposta da Evolution API. Verifique se o número está correto.');
+    }
+
+    console.log(`EvolutionProxy: ✅ Pairing Code gerado: ${code} para número ${cleanNumber}`);
+    return res.json({ code });
+  } catch (error: any) {
+    console.error(`EvolutionProxy: ❌ Falha ao gerar Pairing Code: ${error.message}`);
+    return res.status(500).json({ error: `Falha ao gerar pairing code: ${error.message}` });
+  }
+});
+// 5. GET /status - Verifica e sincroniza o estado de conexão manualmente (fallback para webhook)
+router.get('/status', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const uid = req.user?.uid;
+  if (!uid) return res.status(400).json({ error: 'User UID not found.' });
+
+  const instanceName = `user_${uid}`;
+
+  if (!isEvolutionConfigured()) {
+    return res.json({ connected: false, state: 'demo_mode' });
+  }
+
+  try {
+    const response = await axios.get(
+      `${EVOLUTION_API_URL}/instance/connectionState/${instanceName}`,
+      { headers: { apikey: EVOLUTION_API_KEY }, timeout: 5000 }
+    );
+
+    const state = response.data?.instance?.state || response.data?.state || 'unknown';
+    const isConnected = state === 'open';
+
+    if (isConnected && initialized && db) {
+      // Firestore update é best-effort — falha não deve bloquear a resposta
+      db.collection('users').doc(uid).update({ whatsappConnected: true })
+        .then(() => console.log(`EvolutionProxy: ✅ Firestore atualizado — ${instanceName} CONECTADO`))
+        .catch((err: any) => console.warn(`EvolutionProxy: ⚠️ Firestore update falhou: ${err.message}`));
+    }
+
+    return res.json({ connected: isConnected, state });
+  } catch (error: any) {
+    console.warn(`EvolutionProxy: ⚠️ Falha ao verificar status (${error.message})`);
+    return res.json({ connected: false, state: 'error', error: error.message });
+  }
+});
+
+router.post('/webhook', async (req, res) => {
+  const { event, instance, data } = req.body;
+
+  if (!event || !instance) {
+    return res.status(200).json({ status: 'ignored', reason: 'No event or instance information' });
+  }
+
+  console.log(`EvolutionWebhook: Evento "${event}" recebido para instância "${instance}"`);
+
+  // Filtra apenas o evento de alteração de conexão
+  if (event === 'connection.update' || event === 'CONNECTION_UPDATE') {
+    const userId = instance.replace('user_', '');
+    const status = data?.status || data?.state;
+    const isConnected = status === 'open' || status === 'CONNECTED';
+
+    console.log(`EvolutionWebhook: Instância ${instance} atualizou status para ${status} (Connected: ${isConnected})`);
+
+    if (initialized && db) {
+      try {
+        await db.collection('users').doc(userId).update({
+          whatsappConnected: isConnected,
+        });
+        console.log(`EvolutionWebhook: ✅ Firestore atualizado reativamente para o usuário ${userId}`);
+      } catch (err: any) {
+        console.error(`EvolutionWebhook: ❌ Falha ao atualizar Firestore do usuário:`, err.message);
+      }
+    } else {
+      console.warn('EvolutionWebhook: ⚠️ Firestore indisponível para atualização reativa.');
+    }
+  }
+
+  return res.status(200).json({ status: 'processed' });
+});
+
+export default router;

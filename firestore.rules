@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Regras para perfil do usuario - apenas o proprio usuario pode ler/escrever
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // Contatos de emergencia - apenas o proprio usuario pode gerenciar
+      match /contacts/{contactId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Sessoes do WhatsApp - usuario pode ler, apenas backend admin pode escrever
+    match /whatsapp_sessions/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    // Relatos/reports - qualquer usuario autenticado pode ler, apenas o autor pode escrever
+    match /reports/{reportId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.authorId;
+    }
+
+    // Configurações globais - qualquer um pode ler (essencial para carregar a URL do proxy local), escrita bloqueada
+    match /config/{configId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}
