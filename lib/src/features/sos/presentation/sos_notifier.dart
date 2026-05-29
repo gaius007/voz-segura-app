@@ -7,13 +7,16 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../contacts/data/contact_repository.dart';
+import '../data/evolution_api_service.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 
 // Esse Notifier agora eh o "cerebro" do SOS
 // Ele pega a localizacao e manda as mensagens pros contatos
+// Agora com disparo SILENCIOSO via Evolution API + fallback local de emergencia
 class SOSNotifier extends ChangeNotifier {
   final AuthRepository authRepository;
   final ContactRepository contactRepository;
+  final EvolutionApiService _evolutionService = EvolutionApiService();
 
   static const smsChannel = MethodChannel('com.example.voz_segura_app/sms');
 
@@ -133,39 +136,67 @@ class SOSNotifier extends ChangeNotifier {
     return await Geolocator.getCurrentPosition();
   }
 
-  // Abre o app de WhatsApp do celular
+  // Limpa e padroniza o numero de telefone para formato internacional brasileiro
+  String _cleanPhoneNumber(String phone) {
+    String clean = phone.replaceAll(RegExp(r'[\s\(\)\-\+]'), '');
+    // Padronização automática de DDI para o Brasil (55)
+    if ((clean.length == 10 || clean.length == 11) && !clean.startsWith('55')) {
+      clean = '55$clean';
+    }
+    return clean;
+  }
+
+  // Envia WhatsApp com disparo SILENCIOSO via Evolution API + fallback local
+  // Estrategia de resiliencia em 3 camadas:
+  //   1. Tenta envio silencioso via backend (Evolution API) - sem interacao da usuaria
+  //   2. Fallback: abre WhatsApp nativo via wa.me (exige interacao)
+  //   3. Fallback definitivo: envia SMS
   Future<void> _sendWhatsApp(String phone, String link) async {
-    // 1. Limpeza de caracteres especiais
-    String cleanPhone = phone.replaceAll(RegExp(r'[\s\(\)\-\+]'), '');
-    
-    // 2. Padronização automática de DDI para o Brasil (55)
-    if ((cleanPhone.length == 10 || cleanPhone.length == 11) && !cleanPhone.startsWith('55')) {
-      cleanPhone = '55$cleanPhone';
+    String cleanPhone = _cleanPhoneNumber(phone);
+
+    final String emergencyMessage =
+        '🚨 *ALERTA DE EMERGÊNCIA - VOZ SEGURA* 🚨\n\n'
+        'Estou em perigo! Minha localização em tempo real no mapa:\n$link';
+
+    // === CAMADA 1: Envio silencioso via Evolution API (backend proxy) ===
+    bool silentSuccess = false;
+    try {
+      silentSuccess = await _evolutionService.sendWhatsAppMessage(
+        recipientPhone: cleanPhone,
+        message: emergencyMessage,
+      );
+    } catch (e) {
+      debugPrint("WhatsApp silencioso falhou: $e");
     }
 
+    if (silentSuccess) {
+      debugPrint("✅ WhatsApp silencioso enviado com sucesso via Evolution API!");
+      return; // Sucesso total, nao precisa de fallback
+    }
+
+    // === CAMADA 2: Fallback - Abre WhatsApp nativo via wa.me ===
+    debugPrint("⚠️ Ativando fallback: WhatsApp nativo (wa.me)...");
     final message = Uri.encodeComponent("ESTOU EM PERIGO! Minha localização atual: $link");
     final Uri whatsappUri = Uri.parse("https://wa.me/$cleanPhone?text=$message");
     
     try {
       if (await canLaunchUrl(whatsappUri)) {
         await launchUrl(whatsappUri, mode: LaunchMode.externalApplication);
+        return; // Abriu o WhatsApp nativo com sucesso
       } else {
         throw "WhatsApp não instalado";
       }
     } catch (e) {
-      debugPrint("WhatsApp falhou: $e. Chamando contingência SMS...");
-      await _sendSMS(phone, link); // Contingência automática
+      debugPrint("WhatsApp nativo falhou: $e. Chamando contingência SMS...");
     }
+
+    // === CAMADA 3: Fallback definitivo - SMS ===
+    await _sendSMS(phone, link);
   }
 
   // Envia SMS de forma silenciosa via MethodChannel ou fallback manual via url_launcher
   Future<void> _sendSMS(String phone, String link) async {
-    String cleanPhone = phone.replaceAll(RegExp(r'[\s\(\)\-\+]'), '');
-
-    // Garantir DDI do Brasil se o número tiver apenas DDD + telefone
-    if ((cleanPhone.length == 10 || cleanPhone.length == 11) && !cleanPhone.startsWith('55')) {
-      cleanPhone = '55$cleanPhone';
-    }
+    String cleanPhone = _cleanPhoneNumber(phone);
 
     bool sentSilently = false;
 
