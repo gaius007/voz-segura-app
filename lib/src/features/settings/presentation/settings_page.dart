@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 import 'package:voz_segura_app/src/features/auth/data/auth_repository.dart';
 import 'package:voz_segura_app/src/features/shared/camouflage/camouflage_notifier.dart';
 import 'package:voz_segura_app/src/features/shared/camouflage/camouflage_dialog.dart';
+import 'package:voz_segura_app/src/features/sos/data/evolution_api_service.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -15,6 +18,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   late TextEditingController _wordController;
   late TextEditingController _nameController;
+  final EvolutionApiService _evolutionService = EvolutionApiService();
 
   @override
   void initState() {
@@ -77,6 +81,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 32),
 
+            // Seção de Dispositivo de Emergência (WhatsApp vinculado)
+            _buildSectionHeader('Dispositivo de Emergência', Icons.phonelink_ring_outlined),
+            const SizedBox(height: 16),
+            _buildWhatsAppSection(user?.uid),
+
+            const SizedBox(height: 32),
+
             // Seção de Segurança / Camuflagem
             _buildSectionHeader('Segurança e Camuflagem', Icons.security_outlined),
             const SizedBox(height: 16),
@@ -131,6 +142,293 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  // Seção de vinculação do WhatsApp com status em tempo real do Firestore
+  Widget _buildWhatsAppSection(String? uid) {
+    if (uid == null) {
+      return _buildInfoCard([
+        const Text(
+          'Faça login para ver o status do seu dispositivo.',
+          style: TextStyle(color: AppColors.textLight),
+        ),
+      ]);
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+      builder: (context, snapshot) {
+        // Estado de carregamento
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildInfoCard([
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2),
+              ),
+            ),
+          ]);
+        }
+
+        // Se o documento do usuario nao existir ainda no Firestore
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return _buildInfoCard([
+            const Text(
+              'Perfil ainda não configurado. Complete o cadastro com seu número de WhatsApp.',
+              style: TextStyle(color: AppColors.textLight, fontSize: 13),
+            ),
+          ]);
+        }
+
+        final userData = snapshot.data!.data() as Map<String, dynamic>?;
+        final bool isConnected = userData?['whatsappConnected'] ?? false;
+        final String phoneNumber = userData?['phoneNumber'] ?? 'Não cadastrado';
+
+        return _buildInfoCard([
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('WhatsApp Vinculado', style: TextStyle(color: AppColors.rose)),
+                    const SizedBox(height: 4),
+                    Text(
+                      phoneNumber,
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textMain),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isConnected
+                      ? Colors.green.withValues(alpha: 0.1)
+                      : AppColors.ruby.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isConnected ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                      size: 14,
+                      color: isConnected ? Colors.green : AppColors.ruby,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isConnected ? 'CONECTADO' : 'DESCONECTADO',
+                      style: TextStyle(
+                        color: isConnected ? Colors.green : AppColors.ruby,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24, color: AppColors.sakura),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _handleWhatsAppConnection(context, uid, isConnected),
+              icon: Icon(
+                isConnected ? Icons.phonelink_erase_rounded : Icons.qr_code_2_rounded,
+                size: 20,
+              ),
+              label: Text(
+                isConnected ? 'Desconectar Dispositivo' : 'Vincular por QR Code',
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isConnected ? AppColors.rose : AppColors.ruby,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isConnected
+                ? 'Seu WhatsApp está pronto para disparos automáticos de emergência.'
+                : 'Vincule seu WhatsApp para habilitar envio automático silencioso no SOS.',
+            style: const TextStyle(fontSize: 11, color: AppColors.textLight),
+            textAlign: TextAlign.center,
+          ),
+        ]);
+      },
+    );
+  }
+
+  // Gerencia a conexao/desconexao do WhatsApp
+  void _handleWhatsAppConnection(BuildContext context, String uid, bool isConnected) async {
+    if (isConnected) {
+      // Confirma desconexao
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            'Desconectar WhatsApp?',
+            style: TextStyle(color: AppColors.textMain, fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            'O envio automático silencioso de WhatsApp será desativado. '
+            'O app usará o fallback manual (abrindo o WhatsApp) nos próximos alertas de SOS.',
+            style: TextStyle(color: AppColors.textMain, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar', style: TextStyle(color: AppColors.rose)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.ruby),
+              child: const Text('Desconectar', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        await _evolutionService.disconnectWhatsApp(uid);
+        // Atualiza status no Firestore localmente
+        await FirebaseFirestore.instance.collection('users').doc(uid).update({
+          'whatsappConnected': false,
+        });
+      }
+      return;
+    }
+
+    // Mostra modal de QR Code para vincular
+    _showQRCodeDialog(context, uid);
+  }
+
+  // Modal de QR Code para vinculacao do WhatsApp
+  void _showQRCodeDialog(BuildContext context, String uid) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.qr_code_2_rounded, color: AppColors.ruby, size: 24),
+            SizedBox(width: 8),
+            Text(
+              'Vincular WhatsApp',
+              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.ruby),
+            ),
+          ],
+        ),
+        content: FutureBuilder<String?>(
+          future: _evolutionService.fetchQRCode(uid),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SizedBox(
+                height: 220,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: AppColors.ruby),
+                      SizedBox(height: 16),
+                      Text(
+                        'Gerando QR Code...',
+                        style: TextStyle(color: AppColors.textLight, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            if (snapshot.hasError || snapshot.data == null) {
+              return const SizedBox(
+                height: 200,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline, color: AppColors.ruby, size: 48),
+                      SizedBox(height: 16),
+                      Text(
+                        'Erro ao gerar QR Code.',
+                        style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textMain),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Verifique se o backend está configurado e tente novamente.',
+                        style: TextStyle(color: AppColors.textLight, fontSize: 12),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            // Decodifica o QR Code Base64
+            try {
+              final qrData = snapshot.data!;
+              final base64String = qrData.contains(',') ? qrData.split(',').last : qrData;
+              final bytes = base64Decode(base64String);
+
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Abra o WhatsApp no celular:\nAparelhos conectados → Conectar aparelho',
+                    style: TextStyle(fontSize: 13, color: AppColors.textMain, height: 1.4),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.sakura, width: 2),
+                      borderRadius: BorderRadius.circular(16),
+                      color: Colors.white,
+                    ),
+                    child: Image.memory(
+                      bytes,
+                      width: 200,
+                      height: 200,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Escaneie este código com seu WhatsApp',
+                    style: TextStyle(fontSize: 11, color: AppColors.textLight),
+                  ),
+                ],
+              );
+            } catch (e) {
+              return const Text(
+                'Formato de QR Code inválido.',
+                style: TextStyle(color: AppColors.ruby),
+              );
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Fechar', style: TextStyle(color: AppColors.rose)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
@@ -181,7 +479,7 @@ class _SettingsPageState extends State<SettingsPage> {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: AppColors.ruby,
+          activeThumbColor: AppColors.ruby,
           activeTrackColor: AppColors.sakura,
         ),
       ],
