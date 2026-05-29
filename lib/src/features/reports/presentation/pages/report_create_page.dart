@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:voz_segura_app/src/features/auth/data/auth_repository.dart';
+import 'package:voz_segura_app/src/features/auth/domain/auth_repository.dart';
 import '../manager/report_notifier.dart';
 import 'dart:io' as io;
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';

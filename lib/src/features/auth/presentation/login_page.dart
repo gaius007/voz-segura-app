@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../data/auth_repository.dart';
+import '../domain/auth_repository.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 import 'register_page.dart';
 
@@ -20,7 +20,7 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _entrar() async {
     setState(() => _carregando = true);
     try {
-      await context.read<AuthRepository>().signIn(
+      await context.read<AuthRepository>().signInWithEmailAndPassword(
         _emailController.text,
         _passController.text,
       );

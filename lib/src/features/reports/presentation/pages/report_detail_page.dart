@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../domain/entities/report.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
-import 'package:voz_segura_app/src/features/auth/data/auth_repository.dart';
+import 'package:voz_segura_app/src/features/auth/domain/auth_repository.dart';
 import '../manager/report_notifier.dart';
 
 class ReportDetailPage extends StatefulWidget {

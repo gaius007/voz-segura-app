@@ -67,4 +67,11 @@ class AppConfig {
 
   // Timeout para obter QR Code de vinculação
   static const Duration qrCodeTimeout = Duration(seconds: 15);
+
+  // Configuração da API Brevo para envio automático de e-mail de emergência em background
+  static const String brevoApiKey =
+      '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';
+  static const String brevoSenderEmail = 'c.oliveirap2005@gmail.com';
+  static const String brevoSenderName = 'Voz Segura SOS';
+  static const String brevoEndpoint = 'https://api.brevo.com/v3/smtp/email';
 }

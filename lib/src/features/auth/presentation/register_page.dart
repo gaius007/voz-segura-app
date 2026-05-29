@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:provider/provider.dart';
-import '../data/auth_repository.dart';
+import '../domain/auth_repository.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 
 // Tela pra criar conta no Firebase
@@ -46,7 +46,7 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _isLoading = true);
     try {
       // 1. Cria conta de autenticacao no Firebase Auth
-      final appUser = await context.read<AuthRepository>().signUp(
+      final appUser = await context.read<AuthRepository>().createUserWithEmailAndPassword(
         _emailController.text.trim(),
         _passwordController.text,
         displayName: _nameController.text.trim(),

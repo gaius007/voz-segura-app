@@ -4,15 +4,27 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'src/features/auth/data/auth_repository.dart';
+import 'src/features/auth/domain/auth_repository.dart';
 import 'src/features/auth/domain/app_user.dart';
 import 'src/features/auth/presentation/login_page.dart';
-import 'src/features/contacts/data/contact_repository.dart';
+import 'src/features/contacts/data/repositories/contact_repository_impl.dart';
+import 'src/features/contacts/domain/repositories/contact_repository.dart';
+import 'src/features/contacts/domain/usecases/watch_contacts.dart';
+import 'src/features/contacts/domain/usecases/add_contact.dart';
+import 'src/features/contacts/domain/usecases/update_contact.dart';
+import 'src/features/contacts/domain/usecases/delete_contact.dart';
 import 'src/features/reports/data/repositories/report_repository_impl.dart';
+import 'src/features/reports/domain/repositories/report_repository.dart';
 import 'src/features/reports/domain/usecases/create_report.dart';
 import 'src/features/reports/domain/usecases/get_reports.dart';
 import 'src/features/reports/domain/usecases/update_report.dart';
 import 'src/features/reports/domain/usecases/delete_report.dart';
 import 'src/features/reports/presentation/manager/report_notifier.dart';
+import 'src/features/sos/data/services/location_service_impl.dart';
+import 'src/features/sos/domain/services/location_service.dart';
+import 'src/features/sos/data/repositories/sos_sender_repository_impl.dart';
+import 'src/features/sos/domain/repositories/sos_sender_repository.dart';
+import 'src/features/sos/domain/usecases/send_sos_alert.dart';
 import 'src/features/sos/presentation/sos_notifier.dart';
 import 'src/features/shared/navigation/main_navigation_page.dart';
 import 'src/core/theme/app_theme.dart';
@@ -57,29 +69,51 @@ class VozSeguraApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider(create: (_) => AuthRepository()),
-        Provider(create: (_) => ReportRepositoryImpl()),
-        Provider(create: (_) => ContactRepository()),
-        
-        ProxyProvider<ReportRepositoryImpl, CreateReport>(
+        Provider<AuthRepository>(create: (_) => AuthRepositoryImpl()),
+        Provider<ReportRepository>(create: (_) => ReportRepositoryImpl()),
+        Provider<ContactRepository>(create: (_) => ContactRepositoryImpl()),
+        Provider<LocationService>(create: (_) => LocationServiceImpl()),
+        Provider<SosSenderRepository>(create: (_) => SosSenderRepositoryImpl()),
+
+        ProxyProvider<ContactRepository, WatchContacts>(
+          update: (_, repo, __) => WatchContacts(repo),
+        ),
+        ProxyProvider<ContactRepository, AddContact>(
+          update: (_, repo, __) => AddContact(repo),
+        ),
+        ProxyProvider<ContactRepository, UpdateContact>(
+          update: (_, repo, __) => UpdateContact(repo),
+        ),
+        ProxyProvider<ContactRepository, DeleteContact>(
+          update: (_, repo, __) => DeleteContact(repo),
+        ),
+
+        ProxyProvider<ReportRepository, CreateReport>(
           update: (_, repo, __) => CreateReport(repo),
         ),
-        ProxyProvider<ReportRepositoryImpl, GetReports>(
+        ProxyProvider<ReportRepository, GetReports>(
           update: (_, repo, __) => GetReports(repo),
         ),
-        ProxyProvider<ReportRepositoryImpl, UpdateReport>(
+        ProxyProvider<ReportRepository, UpdateReport>(
           update: (_, repo, __) => UpdateReport(repo),
         ),
-        ProxyProvider<ReportRepositoryImpl, DeleteReport>(
+        ProxyProvider<ReportRepository, DeleteReport>(
           update: (_, repo, __) => DeleteReport(repo),
         ),
-        
-        ChangeNotifierProxyProvider2<AuthRepository, ContactRepository, SOSNotifier>(
-          create: (context) => SOSNotifier(
-            authRepository: context.read<AuthRepository>(),
-            contactRepository: context.read<ContactRepository>(),
+
+        ProxyProvider3<LocationService, ContactRepository, SosSenderRepository, SendSOSAlert>(
+          update: (_, location, contacts, sender, __) => SendSOSAlert(
+            locationService: location,
+            contactRepository: contacts,
+            sender: sender,
           ),
-          update: (_, auth, contacts, sos) => sos!,
+        ),
+        ChangeNotifierProvider<SOSNotifier>(
+          create: (context) => SOSNotifier(
+            sendSOSAlertUseCase: context.read<SendSOSAlert>(),
+            locationService: context.read<LocationService>(),
+            authRepository: context.read<AuthRepository>(),
+          ),
         ),
         ChangeNotifierProvider<ReportNotifier>(
           create: (context) => ReportNotifier(

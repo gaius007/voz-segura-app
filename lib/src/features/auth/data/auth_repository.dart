@@ -1,12 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import '../domain/app_user.dart';
+import '../domain/auth_repository.dart';
 
 // Essa classe cuida do login e logout no Firebase
 // O professor disse que eh bom separar pra nao ficar tudo na tela
-class AuthRepository {
+class AuthRepositoryImpl implements AuthRepository {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Stream pra saber se o usuario ta logado ou nao
+  @override
   Stream<AppUser?> authStateChanges() {
     return _auth.authStateChanges().map((user) {
       if (user == null) return null;
@@ -19,6 +21,7 @@ class AuthRepository {
   }
 
   // Pega o usuario que ta logado agora
+  @override
   AppUser? get currentUser {
     final user = _auth.currentUser;
     if (user == null) return null;
@@ -30,9 +33,10 @@ class AuthRepository {
   }
 
   // Funcao pra entrar no app
-  Future<AppUser?> signIn(String email, String password) async {
+  @override
+  Future<AppUser?> signInWithEmailAndPassword(String email, String password) async {
     final credential = await _auth.signInWithEmailAndPassword(
-      email: email, 
+      email: email,
       password: password,
     );
     final user = credential.user;
@@ -41,9 +45,10 @@ class AuthRepository {
   }
 
   // Funcao pra criar conta
-  Future<AppUser?> signUp(String email, String password, {String? displayName}) async {
+  @override
+  Future<AppUser?> createUserWithEmailAndPassword(String email, String password, {String? displayName}) async {
     final credential = await _auth.createUserWithEmailAndPassword(
-      email: email, 
+      email: email,
       password: password,
     );
     final user = credential.user;
@@ -54,23 +59,26 @@ class AuthRepository {
     }
     final refreshedUser = _auth.currentUser ?? user;
     return AppUser(
-      uid: refreshedUser.uid, 
+      uid: refreshedUser.uid,
       email: refreshedUser.email ?? '',
       displayName: displayName ?? refreshedUser.displayName,
     );
   }
 
   // Sair do app
+  @override
   Future<void> signOut() {
     return _auth.signOut();
   }
 
   // Recarrega os dados do usuario do servidor para atualizar o cache local (ex: displayName)
+  @override
   Future<void> reload() async {
     await _auth.currentUser?.reload();
   }
 
   // Atualiza o nome do usuario logado no Firebase Auth e recarrega
+  @override
   Future<void> updateDisplayName(String name) async {
     final user = _auth.currentUser;
     if (user != null) {
@@ -79,5 +87,3 @@ class AuthRepository {
     }
   }
 }
-
-

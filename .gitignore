@@ -54,3 +54,22 @@ pubspec_overrides.yaml
 .vscode/
 .idea/
 *.iml
+
+# Robust ignores for builds, gradle, and local configs
+**/build/
+**/.gradle/
+**/.dart_tool/
+**/*.properties
+**/ephemeral/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec_overrides.yaml
+
+# Nested app build / ephemeral ignores
+voz_segura_app/build/
+voz_segura_app/linux/
+voz_segura_app/.dart_tool/
+voz_segura_app/android/.gradle/
+voz_segura_app/android/local.properties
+

@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../domain/contact.dart';
+import '../../domain/contact.dart';
+import '../../domain/repositories/contact_repository.dart';
 
 // Repositorio de contatos com proteção de tempo (timeout)
-class ContactRepository {
+class ContactRepositoryImpl implements ContactRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  @override
   Stream<List<Contact>> watchContacts(String userId) {
     return _firestore
         .collection('users')
@@ -18,6 +20,7 @@ class ContactRepository {
   }
 
   // Salva contato novo (com limite de 15 segundos)
+  @override
   Future<void> addContact(String userId, Contact contact) {
     return _firestore
         .collection('users')
@@ -31,6 +34,7 @@ class ContactRepository {
   }
 
   // Edita contato (com limite de 15 segundos)
+  @override
   Future<void> updateContact(String userId, Contact contact) {
     return _firestore
         .collection('users')
@@ -45,6 +49,7 @@ class ContactRepository {
   }
 
   // Deleta contato
+  @override
   Future<void> deleteContact(String userId, String contactId) {
     return _firestore
         .collection('users')

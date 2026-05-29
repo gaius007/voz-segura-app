@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
-import 'package:voz_segura_app/src/features/auth/data/auth_repository.dart';
+import 'package:voz_segura_app/src/features/auth/domain/auth_repository.dart';
 import 'package:voz_segura_app/src/features/shared/camouflage/camouflage_notifier.dart';
 import 'package:voz_segura_app/src/features/shared/camouflage/camouflage_dialog.dart';
 import 'package:voz_segura_app/src/features/sos/data/evolution_api_service.dart';

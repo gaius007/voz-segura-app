@@ -2,8 +2,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
-import '../../auth/data/auth_repository.dart';
-import '../data/contact_repository.dart';
+import '../../auth/domain/auth_repository.dart';
+import '../domain/usecases/watch_contacts.dart';
+import '../domain/usecases/add_contact.dart';
+import '../domain/usecases/update_contact.dart';
+import '../domain/usecases/delete_contact.dart';
 import '../domain/contact.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 
@@ -22,7 +25,8 @@ class EmergencyContactsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthRepository>().currentUser;
-    final repo = context.read<ContactRepository>();
+    final watchContacts = context.read<WatchContacts>();
+    final deleteContact = context.read<DeleteContact>();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -32,7 +36,7 @@ class EmergencyContactsPage extends StatelessWidget {
       body: user == null
           ? const Center(child: Text("Faça login primeiro!"))
           : StreamBuilder<List<Contact>>(
-              stream: repo.watchContacts(user.uid),
+              stream: watchContacts.execute(user.uid),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -60,7 +64,7 @@ class EmergencyContactsPage extends StatelessWidget {
                     return _ContactCard(
                       contact: contact,
                       onEdit: () => _showModal(context, contact: contact),
-                      onDelete: () => repo.deleteContact(user.uid, contact.id!),
+                      onDelete: () => deleteContact.execute(user.uid, contact.id!),
                     );
                   },
                 );
@@ -246,11 +250,10 @@ class _ContactFormState extends State<ContactForm> {
         methods: _methodEntries.map((e) => ContactMethod(type: e.type, value: e.controller.text)).toList(),
       );
 
-      final repo = context.read<ContactRepository>();
       if (widget.contact == null) {
-        await repo.addContact(user.uid, contact);
+        await context.read<AddContact>().execute(user.uid, contact);
       } else {
-        await repo.updateContact(user.uid, contact);
+        await context.read<UpdateContact>().execute(user.uid, contact);
       }
 
       if (mounted) Navigator.pop(context);
