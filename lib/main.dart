@@ -19,6 +19,8 @@ import 'src/core/theme/app_theme.dart';
 import 'src/features/shared/camouflage/camouflage_notifier.dart';
 import 'src/features/shared/camouflage/camouflage_view.dart';
 
+import 'src/core/config/app_config.dart';
+
 const firebaseConfig = FirebaseOptions(
   apiKey: "AIzaSyAv46EF0QnhCbF83aRuvSzmezfUikmPToU",
   authDomain: "voz-segura---database.firebaseapp.com",
@@ -32,6 +34,10 @@ const firebaseConfig = FirebaseOptions(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: firebaseConfig);
+  
+  // Resolve dinamicamente a URL do servidor proxy local rodando em tunnel público
+  await AppConfig.loadDynamicBackendUrl();
+  
   final prefs = await SharedPreferences.getInstance();
   
   runApp(
