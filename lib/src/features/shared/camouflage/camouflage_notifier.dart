@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:voz_segura_app/src/core/services/app_icon_service.dart';
 
 class CamouflageNotifier extends ChangeNotifier {
   static const _keyIsCamouflaged = 'is_camouflaged';
@@ -26,6 +27,12 @@ class CamouflageNotifier extends ChangeNotifier {
     _isCamouflaged = value;
     await _prefs.setBool(_keyIsCamouflaged, value);
     notifyListeners();
+    // Alterna o ícone do launcher para acompanhar o disfarce (Android).
+    if (value) {
+      await AppIconService.setNewsIcon();
+    } else {
+      await AppIconService.setDefaultIcon();
+    }
   }
 
   Future<void> setSecretWord(String word) async {

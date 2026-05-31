@@ -26,11 +26,35 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+        </activity>
+
+        <!-- Ícone padrão (imagem da tela de login). Habilitado por padrão. -->
+        <activity-alias
+            android:name=".MainActivityDefault"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="voz_segura_app"
+            android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <!-- Ícone camuflado (genérico de notícias). Habilitado em runtime no modo camuflagem. -->
+        <activity-alias
+            android:name=".MainActivityNews"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_news"
+            android:label="Notícias"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity-alias>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

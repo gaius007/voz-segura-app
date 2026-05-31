@@ -62,7 +62,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           fit: BoxFit.cover,
         );
       } catch (e) {
-        imageWidget = const Center(child: Icon(Icons.broken_image_rounded, color: AppColors.rose));
+        imageWidget = Center(child: Icon(Icons.broken_image_rounded, color: context.appRose));
       }
     } else {
       imageWidget = Image.network(
@@ -71,8 +71,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
         loadingBuilder: (context, child, progress) {
           if (progress == null) return child;
           return Container(
-            color: AppColors.sakura,
-            child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            color: context.appSakura,
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: context.appPrimary)),
           );
         },
       );
@@ -96,15 +96,15 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           builder: (context, setDialogState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              backgroundColor: Colors.white,
-              title: const Row(
+              backgroundColor: context.appCardColor,
+              title: Row(
                 children: [
-                  Icon(Icons.edit_note_rounded, color: AppColors.ruby),
-                  SizedBox(width: 8),
+                  Icon(Icons.edit_note_rounded, color: context.appRuby),
+                  const SizedBox(width: 8),
                   Text(
                     'Editar Relato Seguro',
                     style: TextStyle(
-                      color: AppColors.ruby,
+                      color: context.appRuby,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
@@ -118,9 +118,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'DESCRIÇÃO DO RELATO',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.ruby, letterSpacing: 1),
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: context.appRuby, letterSpacing: 1),
                       ),
                       const SizedBox(height: 8),
                       TextFormField(
@@ -137,9 +137,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
+                      Text(
                         'VISIBILIDADE',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.ruby, letterSpacing: 1),
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: context.appRuby, letterSpacing: 1),
                       ),
                       const SizedBox(height: 8),
                       Row(
@@ -156,13 +156,13 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 decoration: BoxDecoration(
                                   color: tempVisibility == ReportVisibility.public
-                                      ? AppColors.sakura
-                                      : Colors.white,
+                                      ? context.appSakura
+                                      : context.appCardColor,
                                   borderRadius: BorderRadius.circular(15),
                                   border: Border.all(
                                     color: tempVisibility == ReportVisibility.public
-                                        ? AppColors.primary
-                                        : Colors.grey.shade300,
+                                        ? context.appPrimary
+                                        : context.appDivider,
                                     width: tempVisibility == ReportVisibility.public ? 2 : 1,
                                   ),
                                 ),
@@ -171,7 +171,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                     Icon(
                                       Icons.public_rounded,
                                       color: tempVisibility == ReportVisibility.public
-                                          ? AppColors.primary
+                                          ? context.appPrimary
                                           : Colors.grey,
                                     ),
                                     const SizedBox(height: 4),
@@ -197,13 +197,13 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 decoration: BoxDecoration(
                                   color: tempVisibility == ReportVisibility.private
-                                      ? AppColors.sakura
-                                      : Colors.white,
+                                      ? context.appSakura
+                                      : context.appCardColor,
                                   borderRadius: BorderRadius.circular(15),
                                   border: Border.all(
                                     color: tempVisibility == ReportVisibility.private
-                                        ? AppColors.primary
-                                        : Colors.grey.shade300,
+                                        ? context.appPrimary
+                                        : context.appDivider,
                                     width: tempVisibility == ReportVisibility.private ? 2 : 1,
                                   ),
                                 ),
@@ -212,7 +212,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                     Icon(
                                       Icons.lock_rounded,
                                       color: tempVisibility == ReportVisibility.private
-                                          ? AppColors.primary
+                                          ? context.appPrimary
                                           : Colors.grey,
                                     ),
                                     const SizedBox(height: 4),
@@ -234,13 +234,13 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
               actions: [
                 TextButton(
                   onPressed: salvando ? null : () => Navigator.pop(context),
-                  child: const Text('Cancelar', style: TextStyle(color: AppColors.textLight)),
+                  child: Text('Cancelar', style: TextStyle(color: context.appTextLight)),
                 ),
                 salvando
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 24,
                         height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: context.appPrimary),
                       )
                     : ElevatedButton(
                         onPressed: () async {
@@ -271,7 +271,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text('Erro ao atualizar: $e'),
-                                  backgroundColor: AppColors.ruby,
+                                  backgroundColor: context.appRuby,
                                   behavior: SnackBarBehavior.floating,
                                 ),
                               );
@@ -283,7 +283,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
+                          backgroundColor: context.appPrimary,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         ),
                         child: const Text('Salvar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -307,35 +307,35 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           builder: (context, setDialogState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              backgroundColor: Colors.white,
-              title: const Row(
+              backgroundColor: context.appCardColor,
+              title: Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: AppColors.ruby),
-                  SizedBox(width: 8),
+                  Icon(Icons.warning_amber_rounded, color: context.appRuby),
+                  const SizedBox(width: 8),
                   Text(
                     'Excluir Relato Seguro',
                     style: TextStyle(
-                      color: AppColors.ruby,
+                      color: context.appRuby,
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                     ),
                   ),
                 ],
               ),
-              content: const Text(
+              content: Text(
                 'Você tem certeza de que deseja excluir permanentemente este relato? Essa ação preserva a integridade dos registros e não poderá ser desfeita.',
-                style: TextStyle(color: AppColors.textMain, fontSize: 14, height: 1.4),
+                style: TextStyle(color: context.appTextMain, fontSize: 14, height: 1.4),
               ),
               actions: [
                 TextButton(
                   onPressed: excluindo ? null : () => Navigator.pop(context),
-                  child: const Text('Cancelar', style: TextStyle(color: AppColors.textLight)),
+                  child: Text('Cancelar', style: TextStyle(color: context.appTextLight)),
                 ),
                 excluindo
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 24,
                         height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: context.appPrimary),
                       )
                     : ElevatedButton(
                         onPressed: () async {
@@ -361,7 +361,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text('Erro ao excluir: $e'),
-                                  backgroundColor: AppColors.ruby,
+                                  backgroundColor: context.appRuby,
                                   behavior: SnackBarBehavior.floating,
                                 ),
                               );
@@ -373,7 +373,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.ruby,
+                          backgroundColor: context.appRuby,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         ),
                         child: const Text('Excluir', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -410,18 +410,18 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.appScaffoldBg,
       appBar: AppBar(
         title: const Text('Detalhes do Relato'),
         actions: canEditOrDelete
             ? [
                 IconButton(
-                  icon: const Icon(Icons.edit_outlined, color: AppColors.ruby),
+                  icon: Icon(Icons.edit_outlined, color: context.appRuby),
                   onPressed: () => _mostrarDialogoEdicao(context, currentReport),
                   tooltip: 'Editar relato',
                 ),
                 IconButton(
-                  icon: const Icon(Icons.delete_outline_rounded, color: AppColors.ruby),
+                  icon: Icon(Icons.delete_outline_rounded, color: context.appRuby),
                   onPressed: () => _mostrarConfirmacaoExclusao(context, currentReport),
                   tooltip: 'Excluir relato',
                 ),
@@ -431,12 +431,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
       ),
       body: Container(
         width: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.sakura, Colors.white],
-          ),
+        decoration: BoxDecoration(
+          gradient: context.appBackgroundGradient,
         ),
         child: Center(
           child: ConstrainedBox(
@@ -454,31 +450,31 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                         margin: const EdgeInsets.only(bottom: 24),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: AppColors.blush.withOpacity(0.6),
+                          color: context.appBlush.withOpacity(0.6),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.rose.withOpacity(0.5)),
+                          border: Border.all(color: context.appRose.withOpacity(0.5)),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.timer_outlined, color: AppColors.ruby),
+                            Icon(Icons.timer_outlined, color: context.appRuby),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Edição e Exclusão Disponíveis',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: AppColors.ruby,
+                                      color: context.appRuby,
                                       fontSize: 13,
                                     ),
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
                                     'Você pode alterar ou remover este relato nos próximos ${_formatDuration(remainingSeconds)}.',
-                                    style: const TextStyle(
-                                      color: AppColors.textMain,
+                                    style: TextStyle(
+                                      color: context.appTextMain,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -494,13 +490,13 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                         margin: const EdgeInsets.only(bottom: 24),
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: context.appCardColor,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: context.appDivider),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.lock_outline_rounded, color: Colors.grey.shade600),
+                            Icon(Icons.lock_outline_rounded, color: context.appTextLight),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
@@ -510,7 +506,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                     'Registro Imutável Ativado',
                                     style: TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.grey.shade700,
+                                      color: context.appTextMain,
                                       fontSize: 13,
                                     ),
                                   ),
@@ -518,7 +514,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                   Text(
                                     'O prazo de 10 minutos expirou. Este relato foi permanentemente selado no sistema para garantir a integridade de evidências.',
                                     style: TextStyle(
-                                      color: Colors.grey.shade600,
+                                      color: context.appTextLight,
                                       fontSize: 12,
                                     ),
                                   ),
@@ -535,10 +531,10 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(28),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.7),
+                      color: context.appGlassColor,
                       borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-                      boxShadow: AppStyles.softShadow,
-                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                      boxShadow: context.appSoftShadow,
+                      border: Border.all(color: context.appGlassBorder),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -548,9 +544,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.calendar_month_rounded, size: 16, color: AppColors.textLight),
+                                Icon(Icons.calendar_month_rounded, size: 16, color: context.appTextLight),
                                 const SizedBox(width: 8),
-                                Text(dataLegal.toUpperCase(), style: const TextStyle(color: AppColors.textLight, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                                Text(dataLegal.toUpperCase(), style: TextStyle(color: context.appTextLight, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                               ],
                             ),
                             Container(
@@ -596,13 +592,13 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                           const SizedBox(height: 12),
                           Row(
                             children: [
-                              const Icon(Icons.person_outline_rounded, size: 16, color: AppColors.ruby),
+                              Icon(Icons.person_outline_rounded, size: 16, color: context.appRuby),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   'Autora: ${currentReport.authorName ?? "Usuária Voz Segura"}',
-                                  style: const TextStyle(
-                                    color: AppColors.ruby,
+                                  style: TextStyle(
+                                    color: context.appRuby,
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -612,14 +608,14 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                           ),
                         ],
                         const SizedBox(height: 24),
-                        const Text(
+                        Text(
                           'ACONTECIMENTO RELATADO',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.ruby, letterSpacing: 1.5),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: context.appRuby, letterSpacing: 1.5),
                         ),
                         const SizedBox(height: 12),
                         Text(
                           currentReport.description,
-                          style: const TextStyle(fontSize: 17, height: 1.6, color: AppColors.textMain, fontWeight: FontWeight.w500),
+                          style: TextStyle(fontSize: 17, height: 1.6, color: context.appTextMain, fontWeight: FontWeight.w500),
                         ),
                       ],
                     ),
@@ -644,8 +640,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                       ? () => _mostrarDialogoEdicao(context, currentReport)
                                       : null,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    disabledBackgroundColor: AppColors.primary.withOpacity(0.3),
+                                    backgroundColor: context.appPrimary,
+                                    disabledBackgroundColor: context.appPrimary.withOpacity(0.3),
                                     disabledForegroundColor: Colors.white70,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -661,12 +657,12 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                 child: OutlinedButton.icon(
                                   icon: Icon(
                                     Icons.delete_outline_rounded,
-                                    color: remainingSeconds > 0 ? AppColors.ruby : AppColors.ruby.withOpacity(0.4),
+                                    color: remainingSeconds > 0 ? context.appRuby : context.appRuby.withOpacity(0.4),
                                   ),
                                   label: Text(
                                     'Excluir Relato',
                                     style: TextStyle(
-                                      color: remainingSeconds > 0 ? AppColors.ruby : AppColors.ruby.withOpacity(0.4),
+                                      color: remainingSeconds > 0 ? context.appRuby : context.appRuby.withOpacity(0.4),
                                     ),
                                   ),
                                   onPressed: remainingSeconds > 0
@@ -674,7 +670,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                       : null,
                                   style: OutlinedButton.styleFrom(
                                     side: BorderSide(
-                                      color: remainingSeconds > 0 ? AppColors.ruby : AppColors.ruby.withOpacity(0.3),
+                                      color: remainingSeconds > 0 ? context.appRuby : context.appRuby.withOpacity(0.3),
                                       width: 2,
                                     ),
                                     padding: const EdgeInsets.symmetric(vertical: 16),
@@ -691,19 +687,19 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Colors.grey.shade50,
+                                color: context.appCardColor,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey.shade200),
+                                border: Border.all(color: context.appDivider),
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.info_outline_rounded, size: 16, color: Colors.grey.shade600),
+                                  Icon(Icons.info_outline_rounded, size: 16, color: context.appTextLight),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       'O prazo para edição ou exclusão deste relato expirou para preservar a integridade das informações.',
                                       style: TextStyle(
-                                        color: Colors.grey.shade600,
+                                        color: context.appTextLight,
                                         fontSize: 12,
                                         height: 1.4,
                                         fontWeight: FontWeight.w500,
@@ -720,9 +716,9 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                   ],
                   const SizedBox(height: 40),
                   
-                  const Text(
+                  Text(
                     'EVIDÊNCIAS COLETADAS',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.ruby, letterSpacing: 1.5),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: context.appRuby, letterSpacing: 1.5),
                   ),
                   const SizedBox(height: 16),
                   
@@ -730,15 +726,15 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: AppColors.sakura.withOpacity(0.3),
+                        color: context.appSakura.withOpacity(0.3),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.rose.withOpacity(0.2)),
+                        border: Border.all(color: context.appRose.withOpacity(0.2)),
                       ),
-                      child: const Row(
+                      child: Row(
                         children: [
-                          Icon(Icons.info_outline_rounded, color: AppColors.rose),
-                          SizedBox(width: 12),
-                          Text('Nenhuma imagem anexada a este relato.', style: TextStyle(color: AppColors.textLight)),
+                          Icon(Icons.info_outline_rounded, color: context.appRose),
+                          const SizedBox(width: 12),
+                          Text('Nenhuma imagem anexada a este relato.', style: TextStyle(color: context.appTextLight)),
                         ],
                       ),
                     )
@@ -759,7 +755,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                           child: Container(
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(24),
-                              boxShadow: AppStyles.softShadow,
+                              boxShadow: context.appSoftShadow,
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(24),

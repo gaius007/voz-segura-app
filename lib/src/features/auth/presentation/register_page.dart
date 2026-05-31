@@ -19,8 +19,11 @@ class _RegisterPageState extends State<RegisterPage> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _phoneController = TextEditingController();
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   // Mascara internacional do Brasil para o campo de telefone
   // Utiliza o mask_text_input_formatter que ja esta no pubspec.yaml
@@ -35,6 +38,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
@@ -96,9 +100,9 @@ class _RegisterPageState extends State<RegisterPage> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "Nome Completo",
-                  prefixIcon: Icon(Icons.person_outline, color: AppColors.primary),
+                  prefixIcon: Icon(Icons.person_outline, color: context.appPrimary),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -111,9 +115,9 @@ class _RegisterPageState extends State<RegisterPage> {
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: "E-mail",
-                  prefixIcon: Icon(Icons.email_outlined, color: AppColors.primary),
+                  prefixIcon: Icon(Icons.email_outlined, color: context.appPrimary),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -128,10 +132,17 @@ class _RegisterPageState extends State<RegisterPage> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
                   labelText: "Senha",
-                  prefixIcon: Icon(Icons.lock_outline_rounded, color: AppColors.primary),
+                  prefixIcon: Icon(Icons.lock_outline_rounded, color: context.appPrimary),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      color: context.appTextLight,
+                    ),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  ),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -144,17 +155,42 @@ class _RegisterPageState extends State<RegisterPage> {
                 },
               ),
               const SizedBox(height: 16),
+              TextFormField(
+                controller: _confirmPasswordController,
+                obscureText: _obscureConfirmPassword,
+                decoration: InputDecoration(
+                  labelText: "Confirmar Senha",
+                  prefixIcon: Icon(Icons.lock_outline_rounded, color: context.appPrimary),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureConfirmPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      color: context.appTextLight,
+                    ),
+                    onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                  ),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'A confirmação de senha é obrigatória';
+                  }
+                  if (value != _passwordController.text) {
+                    return 'As senhas não são iguais';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
 
               // Campo de telefone obrigatorio para vinculacao com WhatsApp
               TextFormField(
                 controller: _phoneController,
                 inputFormatters: [_phoneFormatter],
                 keyboardType: TextInputType.phone,
-                style: const TextStyle(color: AppColors.textMain),
-                decoration: const InputDecoration(
+                style: TextStyle(color: context.appTextMain),
+                decoration: InputDecoration(
                   labelText: 'Número do WhatsApp *',
                   hintText: '+55 (11) 99999-9999',
-                  prefixIcon: Icon(Icons.phone_iphone_rounded, color: AppColors.primary),
+                  prefixIcon: Icon(Icons.phone_iphone_rounded, color: context.appPrimary),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
@@ -171,7 +207,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
               const SizedBox(height: 32),
               _isLoading
-                ? const CircularProgressIndicator(color: AppColors.primary)
+                ? CircularProgressIndicator(color: context.appPrimary)
                 : SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(

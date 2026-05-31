@@ -86,4 +86,10 @@ class AuthRepositoryImpl implements AuthRepository {
       await user.reload();
     }
   }
+
+  // Envia e-mail de recuperacao de senha via Firebase Auth
+  @override
+  Future<void> sendPasswordResetEmail(String email) async {
+    await _auth.sendPasswordResetEmail(email: email);
+  }
 }

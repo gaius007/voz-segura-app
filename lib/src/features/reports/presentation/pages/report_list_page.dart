@@ -1,8 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../manager/report_notifier.dart';
 import '../widgets/report_card.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
+import 'package:voz_segura_app/src/core/widgets/confirm_dialog.dart';
 
 class ReportListPage extends StatefulWidget {
   const ReportListPage({super.key});
@@ -37,6 +39,47 @@ class _ReportListPageState extends State<ReportListPage> {
     }
   }
 
+  /// Confirma e executa a exclusão. Retorna `true` somente se o relato foi
+  /// realmente excluído (para o Dismissible removê-lo da lista). Caso a regra
+  /// de 10 minutos/autoria barre a exclusão no repositório, exibe um SnackBar
+  /// e mantém o item na lista.
+  Future<bool> _confirmarExclusaoRelato(BuildContext context, String reportId) async {
+    final confirmado = await showConfirmDialog(
+      context,
+      title: 'Excluir Relato Seguro',
+      message:
+          'Você tem certeza de que deseja excluir permanentemente este relato? Essa ação não poderá ser desfeita.',
+    );
+    if (!confirmado) return false;
+
+    try {
+      await context.read<ReportNotifier>().excluirRelato(reportId);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Relato excluído com sucesso!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      // A lista já é recarregada pelo notifier; não deixamos o Dismissible
+      // animar a remoção para evitar conflito de índices.
+      return false;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString().replaceFirst('Exception: ', '')),
+            backgroundColor: AppColors.ruby,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<ReportNotifier>();
@@ -53,7 +96,7 @@ class _ReportListPageState extends State<ReportListPage> {
               ? const Center(child: CircularProgressIndicator()) 
               : RefreshIndicator(
                   onRefresh: () => notifier.carregarRelatos(),
-                  color: AppColors.primary,
+                  color: context.appPrimary,
                   child: notifier.reports.isEmpty
                       ? _buildVazio()
                       : ListView.builder(
@@ -62,19 +105,19 @@ class _ReportListPageState extends State<ReportListPage> {
                           itemCount: notifier.reports.length + (notifier.hasMore ? 1 : 0),
                           itemBuilder: (context, index) {
                             if (index == notifier.reports.length) {
-                              return const Padding(
-                                padding: EdgeInsets.symmetric(vertical: 24),
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 24),
                                 child: Center(
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2.5,
-                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                    valueColor: AlwaysStoppedAnimation<Color>(context.appPrimary),
                                   ),
                                 ),
                               );
                             }
 
                             final report = notifier.reports[index];
-                            return TweenAnimationBuilder(
+                            final card = TweenAnimationBuilder(
                               duration: Duration(milliseconds: 300 + (index < 5 ? index * 100 : 0)),
                               curve: Curves.easeOutCubic,
                               tween: Tween<double>(begin: 0, end: 1),
@@ -87,6 +130,29 @@ class _ReportListPageState extends State<ReportListPage> {
                                   ),
                                 );
                               },
+                            );
+
+                            // Swipe-to-delete apenas nos relatos da própria usuária.
+                            final currentUid = FirebaseAuth.instance.currentUser?.uid;
+                            if (report.authorUid == null || report.authorUid != currentUid) {
+                              return card;
+                            }
+
+                            return Dismissible(
+                              key: ValueKey(report.id),
+                              direction: DismissDirection.endToStart,
+                              confirmDismiss: (_) => _confirmarExclusaoRelato(context, report.id),
+                              background: Container(
+                                margin: const EdgeInsets.only(bottom: 20),
+                                padding: const EdgeInsets.only(right: 28),
+                                alignment: Alignment.centerRight,
+                                decoration: BoxDecoration(
+                                  color: context.appRuby,
+                                  borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                                ),
+                                child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 28),
+                              ),
+                              child: card,
                             );
                           },
                         ),
@@ -101,7 +167,7 @@ class _ReportListPageState extends State<ReportListPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.auto_stories_rounded, size: 80, color: AppColors.rose.withOpacity(0.4)),
+          Icon(Icons.auto_stories_rounded, size: 80, color: context.appRose.withOpacity(0.4)),
           const SizedBox(height: 20),
           const Text(
             'Seu histórico está limpo.',

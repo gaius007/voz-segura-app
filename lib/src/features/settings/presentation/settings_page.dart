@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
+import 'package:voz_segura_app/src/core/theme/theme_notifier.dart';
 import 'package:voz_segura_app/src/features/auth/domain/auth_repository.dart';
 import 'package:voz_segura_app/src/features/shared/camouflage/camouflage_notifier.dart';
 import 'package:voz_segura_app/src/features/shared/camouflage/camouflage_dialog.dart';
@@ -50,9 +52,10 @@ class _SettingsPageState extends State<SettingsPage> {
     final authRepo = context.read<AuthRepository>();
     final user = authRepo.currentUser;
     final camouNotifier = context.watch<CamouflageNotifier>();
+    final themeNotifier = context.watch<ThemeNotifier>();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.appScaffoldBg,
       appBar: AppBar(
         title: const Text('Configurações'),
         backgroundColor: Colors.transparent,
@@ -75,8 +78,6 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               const Divider(height: 24, color: AppColors.sakura),
               _buildInfoRow('Email', user?.email ?? 'Não informado'),
-              const Divider(height: 24, color: AppColors.sakura),
-              _buildInfoRow('ID do Usuário', user?.uid ?? '---'),
             ]),
 
             const SizedBox(height: 32),
@@ -88,13 +89,20 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 32),
 
+            // Seção de Aparência / Tema
+            _buildSectionHeader('Aparência', Icons.palette_outlined),
+            const SizedBox(height: 16),
+            _buildThemeSection(themeNotifier),
+
+            const SizedBox(height: 32),
+
             // Seção de Segurança / Camuflagem
             _buildSectionHeader('Segurança e Camuflagem', Icons.security_outlined),
             const SizedBox(height: 16),
             _buildInfoCard([
               _buildSwitchRow(
                 'Modo Camuflagem',
-                'Disfarça o app como um portal de notícias',
+                'Disfarça o app como um portal de notícias. Para sair, segure a notícia com sua palavra-chave por 5 segundos.',
                 camouNotifier.isCamouflaged,
                 (val) {
                   if (val && camouNotifier.showExplanation) {
@@ -109,11 +117,18 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               const Divider(height: 24, color: AppColors.sakura),
               _buildEditRow(
-                'Palavra de Desativação',
+                'Palavra-chave de saída',
                 camouNotifier.secretWord,
                 () => _showEditWordDialog(context, camouNotifier),
               ),
             ]),
+
+            const SizedBox(height: 32),
+
+            // Seção de Apoio e Denúncia
+            _buildSectionHeader('Apoio e Denúncia', Icons.shield_outlined),
+            const SizedBox(height: 16),
+            _buildSupportSection(),
 
             const SizedBox(height: 48),
 
@@ -122,12 +137,12 @@ class _SettingsPageState extends State<SettingsPage> {
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () => authRepo.signOut(),
-                icon: const Icon(Icons.logout),
+                icon: const Icon(Icons.logout_rounded),
                 label: const Text('Sair da Conta'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: AppColors.ruby,
-                  side: const BorderSide(color: AppColors.sakura),
+                  backgroundColor: context.appCardColor,
+                  foregroundColor: context.appRuby,
+                  side: BorderSide(color: context.appDivider),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -429,14 +444,83 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  // Seção de canais de apoio: Disque 180 e localização da Delegacia da Mulher
+  Widget _buildSupportSection() {
+    return _buildInfoCard([
+      const Text(
+        'Em caso de violência ou risco, busque ajuda. Estes canais são gratuitos e sigilosos.',
+        style: TextStyle(fontSize: 12, color: AppColors.textLight, height: 1.4),
+      ),
+      const SizedBox(height: 16),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => _abrirLink('tel:180'),
+          icon: const Icon(Icons.call_rounded, size: 20),
+          label: const Text('Disque 180 — Central de Atendimento à Mulher'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.ruby,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+      SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => _abrirLink('https://www.google.com/maps/search/delegacia+da+mulher'),
+          icon: const Icon(Icons.location_on_outlined, size: 20),
+          label: const Text('Delegacia da Mulher mais próxima'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: AppColors.ruby,
+            side: const BorderSide(color: AppColors.sakura),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 0,
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  Future<void> _abrirLink(String url) async {
+    final uri = Uri.parse(url);
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível abrir este recurso no dispositivo.'),
+            backgroundColor: AppColors.ruby,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível abrir este recurso no dispositivo.'),
+            backgroundColor: AppColors.ruby,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildSectionHeader(String title, IconData icon) {
     return Row(
       children: [
-        Icon(icon, color: AppColors.ruby, size: 20),
+        Icon(icon, color: context.appRuby, size: 20),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: AppStyles.h1.copyWith(fontSize: 18),
+        Flexible(
+          child: Text(
+            title,
+            style: AppStyles.h1.copyWith(fontSize: 18, color: context.appRuby),
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );
@@ -446,9 +530,9 @@ class _SettingsPageState extends State<SettingsPage> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.appCardColor,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: AppStyles.softShadow,
+        boxShadow: context.appSoftShadow,
       ),
       child: Column(children: children),
     );
@@ -458,8 +542,16 @@ class _SettingsPageState extends State<SettingsPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: const TextStyle(color: AppColors.rose)),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textMain)),
+        Flexible(child: Text(label, style: TextStyle(color: context.appRose))),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            value,
+            style: TextStyle(fontWeight: FontWeight.bold, color: context.appTextMain),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
@@ -471,16 +563,14 @@ class _SettingsPageState extends State<SettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textMain)),
-              Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.rose)),
+              Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: context.appTextMain)),
+              Text(subtitle, style: TextStyle(fontSize: 12, color: context.appRose)),
             ],
           ),
         ),
         Switch(
           value: value,
           onChanged: onChanged,
-          activeThumbColor: AppColors.ruby,
-          activeTrackColor: AppColors.sakura,
         ),
       ],
     );
@@ -490,19 +580,112 @@ class _SettingsPageState extends State<SettingsPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: const TextStyle(color: AppColors.rose)),
-            Text(value, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.ruby)),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(color: context.appRose)),
+              Text(
+                value,
+                style: TextStyle(fontWeight: FontWeight.bold, color: context.appRuby),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
         IconButton(
           onPressed: onEdit,
-          icon: const Icon(Icons.edit_outlined, color: AppColors.rose),
+          icon: Icon(Icons.edit_outlined, color: context.appRose),
         ),
       ],
     );
+  }
+
+  // ─── Theme Selector Section ──────────────────────────────
+  Widget _buildThemeSection(ThemeNotifier themeNotifier) {
+    return _buildInfoCard([
+      Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tema do Aplicativo',
+                  style: TextStyle(fontWeight: FontWeight.bold, color: context.appTextMain),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _themeDescription(themeNotifier.mode),
+                  style: TextStyle(fontSize: 12, color: context.appRose),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      Row(
+        children: [
+          _buildThemeChip(themeNotifier, AppThemeMode.system, Icons.phone_android_rounded, 'Sistema'),
+          const SizedBox(width: 8),
+          _buildThemeChip(themeNotifier, AppThemeMode.light, Icons.light_mode_rounded, 'Claro'),
+          const SizedBox(width: 8),
+          _buildThemeChip(themeNotifier, AppThemeMode.dark, Icons.dark_mode_rounded, 'Escuro'),
+          const SizedBox(width: 8),
+          _buildThemeChip(themeNotifier, AppThemeMode.dynamic, Icons.auto_awesome_rounded, 'Auto'),
+        ],
+      ),
+    ]);
+  }
+
+  Widget _buildThemeChip(ThemeNotifier notifier, AppThemeMode mode, IconData icon, String label) {
+    final isSelected = notifier.mode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => notifier.setMode(mode),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? context.appPrimary.withOpacity(0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? context.appPrimary : context.appDivider,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: isSelected ? context.appPrimary : context.appTextLight, size: 22),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? context.appPrimary : context.appTextLight,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _themeDescription(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.system:
+        return 'Segue o tema do seu dispositivo.';
+      case AppThemeMode.light:
+        return 'Sempre no modo claro.';
+      case AppThemeMode.dark:
+        return 'Sempre no modo escuro.';
+      case AppThemeMode.dynamic:
+        return 'Claro de dia (6h-18h), escuro à noite.';
+    }
   }
 
   void _showEditWordDialog(BuildContext context, CamouflageNotifier notifier) {

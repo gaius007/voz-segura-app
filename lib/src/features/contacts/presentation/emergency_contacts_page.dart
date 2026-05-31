@@ -9,6 +9,7 @@ import '../domain/usecases/update_contact.dart';
 import '../domain/usecases/delete_contact.dart';
 import '../domain/contact.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
+import 'package:voz_segura_app/src/core/widgets/confirm_dialog.dart';
 
 class EmergencyContactsPage extends StatelessWidget {
   const EmergencyContactsPage({super.key});
@@ -19,6 +20,15 @@ class EmergencyContactsPage extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => ContactForm(contact: contact),
+    );
+  }
+
+  Future<bool> _confirmarExclusao(BuildContext context, Contact contact) {
+    return showConfirmDialog(
+      context,
+      title: 'Excluir Contato',
+      message:
+          'Deseja remover "${contact.name}" da sua rede de apoio? Essa ação não poderá ser desfeita.',
     );
   }
 
@@ -48,7 +58,7 @@ class EmergencyContactsPage extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.people_outline_rounded, size: 80, color: AppColors.rose.withOpacity(0.5)),
+                        Icon(Icons.people_outline_rounded, size: 80, color: context.appRose.withOpacity(0.5)),
                         const SizedBox(height: 16),
                         const Text("Sua rede de apoio está vazia.", style: AppStyles.subtitle),
                       ],
@@ -61,10 +71,30 @@ class EmergencyContactsPage extends StatelessWidget {
                   itemCount: contacts.length,
                   itemBuilder: (context, index) {
                     final contact = contacts[index];
-                    return _ContactCard(
-                      contact: contact,
-                      onEdit: () => _showModal(context, contact: contact),
-                      onDelete: () => deleteContact.execute(user.uid, contact.id!),
+                    return Dismissible(
+                      key: ValueKey(contact.id),
+                      direction: DismissDirection.endToStart,
+                      confirmDismiss: (_) => _confirmarExclusao(context, contact),
+                      onDismissed: (_) => deleteContact.execute(user.uid, contact.id!),
+                      background: Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.only(right: 28),
+                        alignment: Alignment.centerRight,
+                        decoration: BoxDecoration(
+                          color: context.appRuby,
+                          borderRadius: BorderRadius.circular(AppStyles.borderRadius),
+                        ),
+                        child: const Icon(Icons.delete_outline_rounded, color: Colors.white, size: 28),
+                      ),
+                      child: _ContactCard(
+                        contact: contact,
+                        onEdit: () => _showModal(context, contact: contact),
+                        onDelete: () async {
+                          if (await _confirmarExclusao(context, contact)) {
+                            await deleteContact.execute(user.uid, contact.id!);
+                          }
+                        },
+                      ),
                     );
                   },
                 );
@@ -74,7 +104,7 @@ class EmergencyContactsPage extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 90),
         child: FloatingActionButton.extended(
           onPressed: () => _showModal(context),
-          backgroundColor: AppColors.primary,
+          backgroundColor: context.appPrimary,
           label: const Text("NOVO CONTATO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           icon: const Icon(Icons.add, color: Colors.white),
         ),
@@ -99,10 +129,10 @@ class _ContactCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
+        color: context.appGlassColor,
         borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-        boxShadow: AppStyles.softShadow,
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
+        boxShadow: context.appSoftShadow,
+        border: Border.all(color: context.appGlassBorder),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppStyles.borderRadius),
@@ -130,16 +160,24 @@ class _ContactCard extends StatelessWidget {
                     children: [
                       Text(
                         contact.name,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textMain),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.appTextMain),
                       ),
                       const SizedBox(height: 4),
                       ...contact.methods.map((m) => Padding(
                         padding: const EdgeInsets.only(bottom: 2),
                         child: Row(
                           children: [
-                            Icon(_getIconForType(m.type), size: 14, color: AppColors.primary),
+                            Icon(_getIconForType(m.type), size: 14, color: context.appPrimary),
                             const SizedBox(width: 6),
-                            Text(m.value, style: const TextStyle(fontSize: 13, color: AppColors.textLight)),
+                            Expanded(
+                              child: Text(
+                                m.value,
+                                style: TextStyle(fontSize: 13, color: context.appTextLight),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ],
                         ),
                       )),
@@ -275,9 +313,9 @@ class _ContactFormState extends State<ContactForm> {
       child: Container(
         constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
         padding: const EdgeInsets.all(28),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+        decoration: BoxDecoration(
+          color: context.appCardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
         ),
         child: Form(
           key: _formKey,
@@ -290,13 +328,13 @@ class _ContactFormState extends State<ContactForm> {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 20),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: context.isDark ? Colors.grey.shade700 : Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 Text(
                   widget.contact == null ? "Novo Contato" : "Editar Contato",
-                  style: AppStyles.h1.copyWith(fontSize: 22),
+                  style: AppStyles.h1.copyWith(fontSize: 22, color: context.appRuby),
                 ),
                 const SizedBox(height: 24),
                 TextFormField(
@@ -311,11 +349,11 @@ class _ContactFormState extends State<ContactForm> {
                 const SizedBox(height: 24),
                 Row(
                   children: [
-                    const Text("MEIOS DE CONTATO", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textLight, letterSpacing: 1.1)),
+                    Text("MEIOS DE CONTATO", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.appTextLight, letterSpacing: 1.1)),
                     const Spacer(),
                     IconButton(
                       onPressed: _salvando ? null : _addMethod,
-                      icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
+                      icon: Icon(Icons.add_circle_outline_rounded, color: context.appPrimary),
                     ),
                   ],
                 ),
@@ -331,6 +369,7 @@ class _ContactFormState extends State<ContactForm> {
                           flex: 2,
                           child: DropdownButtonFormField<String>(
                             value: entry.type,
+                            dropdownColor: context.appCardColor,
                             items: ['WhatsApp', 'Telefone', 'E-mail'].map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 14)))).toList(),
                             onChanged: _salvando ? null : (v) => setState(() => entry.type = v!),
                             decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12)),
@@ -362,12 +401,12 @@ class _ContactFormState extends State<ContactForm> {
                 }),
                 const SizedBox(height: 32),
                 _salvando 
-                  ? const CircularProgressIndicator()
+                  ? CircularProgressIndicator(color: context.appPrimary)
                   : ElevatedButton(
                       onPressed: _save,
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 60),
-                        backgroundColor: AppColors.primary,
+                        backgroundColor: context.appPrimary,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       ),
                       child: const Text("SALVAR ALTERAÇÕES", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),

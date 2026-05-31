@@ -30,14 +30,10 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       extendBody: true, // Crucial for glass navigation effect
       body: Stack(
         children: [
-          // Background Gradient base
+          // Background Gradient base (theme-aware)
           Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.sakura, Colors.white, AppColors.blush],
-              ),
+            decoration: BoxDecoration(
+              gradient: context.appBackgroundGradient,
             ),
           ),
           // Content
@@ -68,7 +64,7 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
                 MaterialPageRoute(builder: (context) => const ReportCreatePage()),
               );
             },
-            backgroundColor: AppColors.primary,
+            backgroundColor: context.appPrimary,
             elevation: 8,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             child: const Icon(Icons.add_photo_alternate_rounded, color: Colors.white),
@@ -87,12 +83,14 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
               child: Container(
                 height: 75,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.4),
+                  color: context.appGlassColor,
                   borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: Colors.white.withOpacity(0.5)),
+                  border: Border.all(color: context.appGlassBorder),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.pink.withOpacity(0.1),
+                      color: context.isDark
+                          ? Colors.black.withOpacity(0.3)
+                          : Colors.pink.withOpacity(0.1),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     ),
@@ -127,12 +125,14 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
             duration: const Duration(milliseconds: 300),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: selected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+              color: selected ? context.appPrimary.withOpacity(0.1) : Colors.transparent,
               borderRadius: BorderRadius.circular(15),
             ),
             child: Icon(
               icon,
-              color: selected ? AppColors.primary : Colors.grey.shade400,
+              color: selected
+                  ? context.appPrimary
+                  : (context.isDark ? Colors.grey.shade600 : Colors.grey.shade400),
               size: 28,
             ),
           ),
@@ -141,8 +141,8 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
               margin: const EdgeInsets.only(top: 4),
               width: 4,
               height: 4,
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
+              decoration: BoxDecoration(
+                color: context.appPrimary,
                 shape: BoxShape.circle,
               ),
             ),

@@ -11,7 +11,7 @@ class ReportCard extends StatelessWidget {
 
   const ReportCard({super.key, required this.report});
 
-  Widget _mostrarImagem(String path, {required double size}) {
+  Widget _mostrarImagem(BuildContext context, String path, {required double size}) {
     if (path.startsWith('data:image')) {
       try {
         final base64String = path.split(',').last;
@@ -20,10 +20,10 @@ class ReportCard extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildPlaceholder(size),
+          errorBuilder: (ctx, error, stackTrace) => _buildPlaceholder(context, size),
         );
       } catch (e) {
-        return _buildPlaceholder(size);
+        return _buildPlaceholder(context, size);
       }
     } else {
       return Image.network(
@@ -31,17 +31,17 @@ class ReportCard extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _buildPlaceholder(size),
+        errorBuilder: (ctx, error, stackTrace) => _buildPlaceholder(context, size),
       );
     }
   }
 
-  Widget _buildPlaceholder(double size) {
+  Widget _buildPlaceholder(BuildContext context, double size) {
     return Container(
       width: size,
       height: size,
-      color: AppColors.blush.withOpacity(0.3),
-      child: const Icon(Icons.image_rounded, color: AppColors.rose),
+      color: context.appBlush.withOpacity(0.3),
+      child: Icon(Icons.image_rounded, color: context.appRose),
     );
   }
 
@@ -52,10 +52,10 @@ class ReportCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
+        color: context.appGlassColor,
         borderRadius: BorderRadius.circular(AppStyles.borderRadius),
-        boxShadow: AppStyles.softShadow,
-        border: Border.all(color: Colors.white.withOpacity(0.5)),
+        boxShadow: context.appSoftShadow,
+        border: Border.all(color: context.appGlassBorder),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppStyles.borderRadius),
@@ -79,8 +79,8 @@ class ReportCard extends StatelessWidget {
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(20),
                       child: report.photoUrls.isNotEmpty
-                          ? _mostrarImagem(report.photoUrls.first, size: 80)
-                          : _buildPlaceholder(80),
+                          ? _mostrarImagem(context, report.photoUrls.first, size: 80)
+                          : _buildPlaceholder(context, 80),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -92,16 +92,16 @@ class ReportCard extends StatelessWidget {
                           report.description.isEmpty ? 'Relato sem descrição' : report.description,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textMain),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.appTextMain),
                         ),
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            const Icon(Icons.calendar_today_rounded, size: 12, color: AppColors.textLight),
+                            Icon(Icons.calendar_today_rounded, size: 12, color: context.appTextLight),
                             const SizedBox(width: 4),
                             Text(
                               dataFormatada.toUpperCase(),
-                              style: const TextStyle(color: AppColors.textLight, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5),
+                              style: TextStyle(color: context.appTextLight, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.5),
                             ),
                           ],
                         ),
@@ -109,15 +109,15 @@ class ReportCard extends StatelessWidget {
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              const Icon(Icons.person_outline_rounded, size: 12, color: AppColors.rose),
+                              Icon(Icons.person_outline_rounded, size: 12, color: context.appRose),
                               const SizedBox(width: 4),
                               Expanded(
                                 child: Text(
                                   'Autora: ${report.authorName ?? "Usuária Voz Segura"}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: AppColors.ruby,
+                                  style: TextStyle(
+                                    color: context.appRuby,
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -132,12 +132,12 @@ class ReportCard extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: AppColors.sakura,
+                                color: context.appSakura,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Text(
+                              child: Text(
                                 "PROTOCOLO SEGURO",
-                                style: TextStyle(color: AppColors.ruby, fontSize: 9, fontWeight: FontWeight.bold),
+                                style: TextStyle(color: context.appRuby, fontSize: 9, fontWeight: FontWeight.bold),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -182,7 +182,7 @@ class ReportCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right_rounded, color: AppColors.rose),
+                  Icon(Icons.chevron_right_rounded, color: context.appRose),
                 ],
               ),
             ),

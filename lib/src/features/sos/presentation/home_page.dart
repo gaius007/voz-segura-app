@@ -471,7 +471,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
         }
 
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
             title: const Text('VOZ SEGURA'),
             actions: [
@@ -491,7 +491,8 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 },
               ),
               IconButton(
-                icon: const Icon(Icons.power_settings_new_rounded),
+                icon: const Icon(Icons.logout_rounded),
+                tooltip: 'Sair',
                 onPressed: () => sosNotifier.logout(),
               ),
               const SizedBox(width: 8),

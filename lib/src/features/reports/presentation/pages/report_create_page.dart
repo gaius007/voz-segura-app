@@ -45,6 +45,73 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
     }
   }
 
+  Future<void> _abrirGaleria() async {
+    final List<XFile> images = await _picker.pickMultiImage(
+      maxWidth: 800,
+      maxHeight: 800,
+      imageQuality: 70,
+    );
+    if (images.isNotEmpty) {
+      setState(() {
+        _fotosLocais.addAll(images.map((x) => x.path));
+      });
+    }
+  }
+
+  void _removerFoto(int index) {
+    setState(() {
+      _fotosLocais.removeAt(index);
+    });
+  }
+
+  Future<void> _escolherFonteDaImagem() async {
+    if (_enviando) return;
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: context.appCardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.isDark ? Colors.grey.shade700 : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: Icon(Icons.camera_enhance_rounded, color: context.appPrimary),
+                title: const Text('Tirar foto agora'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _abrirCamera();
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library_rounded, color: context.appPrimary),
+                title: const Text('Escolher da galeria'),
+                subtitle: const Text('Você pode selecionar várias fotos'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _abrirGaleria();
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _mostrarAviso10Minutos() async {
     final prefs = await SharedPreferences.getInstance();
     final mostrarAviso = prefs.getBool('show_report_creation_warning') ?? true;
@@ -65,15 +132,15 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
             builder: (context, setDialogState) {
               return AlertDialog(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                backgroundColor: Colors.white,
-                title: const Row(
+                backgroundColor: context.appCardColor,
+                title: Row(
                   children: [
-                    Icon(Icons.info_outline_rounded, color: AppColors.ruby),
-                    SizedBox(width: 8),
+                    Icon(Icons.info_outline_rounded, color: context.appRuby),
+                    const SizedBox(width: 8),
                     Text(
                       'Informação Importante',
                       style: TextStyle(
-                        color: AppColors.ruby, 
+                        color: context.appRuby, 
                         fontWeight: FontWeight.bold, 
                         fontSize: 18
                       ),
@@ -84,9 +151,9 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Você poderá editar ou excluir este relato nos próximos 10 minutos. Após esse período, essas ações serão bloqueadas para preservar a integridade das informações e possíveis provas relacionadas ao relato.',
-                      style: TextStyle(color: AppColors.textMain, fontSize: 14, height: 1.4),
+                      style: TextStyle(color: context.appTextMain, fontSize: 14, height: 1.4),
                     ),
                     const SizedBox(height: 24),
                     InkWell(
@@ -99,17 +166,17 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                         children: [
                           Checkbox(
                             value: naoMostrarNovamente,
-                            activeColor: AppColors.primary,
+                            activeColor: context.appPrimary,
                             onChanged: (val) {
                               setDialogState(() {
                                 naoMostrarNovamente = val ?? false;
                               });
                             },
                           ),
-                          const Expanded(
+                          Expanded(
                             child: Text(
                               'Não mostrar este aviso novamente',
-                              style: TextStyle(color: AppColors.textMain, fontSize: 13),
+                              style: TextStyle(color: context.appTextMain, fontSize: 13),
                             ),
                           ),
                         ],
@@ -128,7 +195,7 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: context.appPrimary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     ),
@@ -240,17 +307,13 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: context.appScaffoldBg,
       appBar: AppBar(
         title: const Text('Novo Relato'),
       ),
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.sakura, Colors.white],
-          ),
+        decoration: BoxDecoration(
+          gradient: context.appBackgroundGradient,
         ),
         child: Center(
           child: ConstrainedBox(
@@ -261,9 +324,9 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
+                  Text(
                     'DETALHES DO RELATO',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ruby, letterSpacing: 1.5),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.appRuby, letterSpacing: 1.5),
                   ),
                   const SizedBox(height: 16),
                   TextField(
@@ -276,29 +339,34 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                     ),
                   ),
                   const SizedBox(height: 40),
-                  const Text(
+                  Text(
                     'EVIDÊNCIAS VISUAIS',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ruby, letterSpacing: 1.5),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.appRuby, letterSpacing: 1.5),
                   ),
                   const SizedBox(height: 16),
                   InkWell(
-                    onTap: _enviando ? null : _abrirCamera,
+                    onTap: _enviando ? null : _escolherFonteDaImagem,
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
                       height: 120,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.6),
+                        color: context.appGlassColor,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: AppColors.rose.withOpacity(0.5), width: 1.5),
+                        border: Border.all(color: context.appGlassBorder, width: 1.5),
                       ),
-                      child: const Column(
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.camera_enhance_rounded, size: 36, color: AppColors.primary),
-                          SizedBox(height: 8),
+                          Icon(Icons.add_a_photo_rounded, size: 36, color: context.appPrimary),
+                          const SizedBox(height: 8),
                           Text(
-                            'CAPTURAR EVIDÊNCIA',
-                            style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 12),
+                            'ADICIONAR EVIDÊNCIAS',
+                            style: TextStyle(color: context.appPrimary, fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Câmera ou galeria',
+                            style: TextStyle(color: context.appTextLight, fontSize: 11),
                           ),
                         ],
                       ),
@@ -315,29 +383,48 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                           final path = _fotosLocais[index];
                           return Padding(
                             padding: const EdgeInsets.only(right: 16),
-                            child: Hero(
-                              tag: 'new-photo-$index',
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: AppStyles.softShadow,
+                            child: Stack(
+                              children: [
+                                Hero(
+                                  tag: 'new-photo-$index',
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(20),
+                                      boxShadow: context.appSoftShadow,
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: kIsWeb
+                                          ? Image.network(path, width: 120, height: 120, fit: BoxFit.cover)
+                                          : Image.file(io.File(path), width: 120, height: 120, fit: BoxFit.cover),
+                                    ),
+                                  ),
                                 ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: kIsWeb 
-                                    ? Image.network(path, width: 120, height: 120, fit: BoxFit.cover)
-                                    : Image.file(io.File(path), width: 120, height: 120, fit: BoxFit.cover),
+                                Positioned(
+                                  top: 6,
+                                  right: 6,
+                                  child: GestureDetector(
+                                    onTap: _enviando ? null : () => _removerFoto(index),
+                                    child: Container(
+                                      decoration: const BoxDecoration(
+                                        color: Colors.black54,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      padding: const EdgeInsets.all(4),
+                                      child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
                           );
                         },
                       ),
                     ),
                   const SizedBox(height: 40),
-                  const Text(
+                  Text(
                     'VISIBILIDADE DO RELATO',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.ruby, letterSpacing: 1.5),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.appRuby, letterSpacing: 1.5),
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -368,13 +455,13 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: _selectedVisibility == ReportVisibility.public 
-                            ? AppColors.sakura.withOpacity(0.5) 
-                            : AppColors.lilac.withOpacity(0.4),
+                            ? context.appSakura.withOpacity(0.5) 
+                            : context.appLilac.withOpacity(0.4),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
                           color: _selectedVisibility == ReportVisibility.public 
-                              ? AppColors.primary.withOpacity(0.3) 
-                              : AppColors.rose.withOpacity(0.3)
+                              ? context.appPrimary.withOpacity(0.3) 
+                              : context.appRose.withOpacity(0.3)
                         ),
                       ),
                       child: Column(
@@ -386,7 +473,7 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                                 _selectedVisibility == ReportVisibility.public 
                                     ? Icons.info_outline_rounded 
                                     : Icons.security_rounded,
-                                color: AppColors.ruby,
+                                color: context.appRuby,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
@@ -394,9 +481,9 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                                 _selectedVisibility == ReportVisibility.public 
                                     ? 'Atenção ao Compartilhar' 
                                     : 'Registro Pessoal Seguro',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: AppColors.ruby,
+                                  color: context.appRuby,
                                   fontSize: 13,
                                 ),
                               ),
@@ -407,9 +494,9 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                             _selectedVisibility == ReportVisibility.public
                                 ? 'Seu relato será publicado na comunidade e poderá ser visualizado por outras pessoas. Caso tenha habilitado compartilhamento de localização, ela poderá ser exibida.'
                                 : 'Seu relato ficará salvo apenas para você, como um registro pessoal. Ele não aparecerá em feeds, comunidades ou buscas públicas.',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textMain,
+                              color: context.appTextMain,
                               height: 1.4,
                             ),
                           ),
@@ -421,14 +508,14 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                   if (_selectedVisibility != null) ...[
                     const SizedBox(height: 40),
                     _enviando 
-                      ? const Center(child: CircularProgressIndicator())
+                      ? CircularProgressIndicator(color: context.appPrimary)
                       : ElevatedButton(
                           onPressed: _salvarNoFirebase,
                           style: ElevatedButton.styleFrom(
                             minimumSize: const Size(double.infinity, 65),
-                            backgroundColor: AppColors.primary,
+                            backgroundColor: context.appPrimary,
                             elevation: 10,
-                            shadowColor: AppColors.primary.withOpacity(0.4),
+                            shadowColor: context.appPrimary.withOpacity(0.4),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),
                           child: const Text(
@@ -438,10 +525,10 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                         ),
                   ],
                   const SizedBox(height: 20),
-                  const Text(
+                  Text(
                     'Suas informações são criptografadas e protegidas.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 11, color: AppColors.textLight, fontStyle: FontStyle.italic),
+                    style: TextStyle(fontSize: 11, color: context.appTextLight, fontStyle: FontStyle.italic),
                   ),
                 ],
               ),
@@ -484,23 +571,23 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
         decoration: BoxDecoration(
           color: isSelected 
-              ? AppColors.sakura.withOpacity(0.8) 
-              : Colors.white.withOpacity(0.5),
+              ? context.appSakura.withOpacity(0.8) 
+              : context.appGlassColor,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected 
-                ? AppColors.primary 
-                : AppColors.rose.withOpacity(0.3),
+                ? context.appPrimary 
+                : context.appRose.withOpacity(0.3),
             width: isSelected ? 2.0 : 1.5,
           ),
-          boxShadow: isSelected ? AppStyles.softShadow : [],
+          boxShadow: isSelected ? context.appSoftShadow : [],
         ),
         child: Column(
           children: [
             Icon(
               icon,
               size: 32,
-              color: isSelected ? AppColors.primary : AppColors.rose,
+              color: isSelected ? context.appPrimary : context.appRose,
             ),
             const SizedBox(height: 8),
             Text(
@@ -508,15 +595,15 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
-                color: isSelected ? AppColors.ruby : AppColors.textMain,
+                color: isSelected ? context.appRuby : context.appTextMain,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               description,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
-                color: AppColors.textLight,
+                color: context.appTextLight,
               ),
             ),
           ],

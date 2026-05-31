@@ -8,4 +8,5 @@ abstract class AuthRepository {
   AppUser? get currentUser;
   Future<void> reload();
   Future<void> updateDisplayName(String name);
+  Future<void> sendPasswordResetEmail(String email);
 }

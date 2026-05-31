@@ -28,6 +28,7 @@ import 'src/features/sos/domain/usecases/send_sos_alert.dart';
 import 'src/features/sos/presentation/sos_notifier.dart';
 import 'src/features/shared/navigation/main_navigation_page.dart';
 import 'src/core/theme/app_theme.dart';
+import 'src/core/theme/theme_notifier.dart';
 import 'src/features/shared/camouflage/camouflage_notifier.dart';
 import 'src/features/shared/camouflage/camouflage_view.dart';
 
@@ -56,6 +57,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => CamouflageNotifier(prefs)),
+        ChangeNotifierProvider(create: (_) => ThemeNotifier(prefs)),
       ],
       child: const VozSeguraApp(),
     ),
@@ -124,11 +126,18 @@ class VozSeguraApp extends StatelessWidget {
           ),
         ),
       ],
-      child: MaterialApp(
-        title: 'Voz Segura App',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        home: const AuthWrapper(),
+      child: Builder(
+        builder: (context) {
+          final themeNotifier = context.watch<ThemeNotifier>();
+          return MaterialApp(
+            title: 'Voz Segura App',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: themeNotifier.themeMode,
+            home: const AuthWrapper(),
+          );
+        },
       ),
     );
   }
