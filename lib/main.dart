@@ -47,12 +47,14 @@ const firebaseConfig = FirebaseOptions(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: firebaseConfig);
-  
-  // Resolve dinamicamente a URL do servidor proxy local rodando em tunnel público
-  await AppConfig.loadDynamicBackendUrl();
-  
+
   final prefs = await SharedPreferences.getInstance();
-  
+
+  // Resolve dinamicamente a URL do servidor proxy local rodando em tunnel público.
+  // Roda em background (sem bloquear o primeiro frame): a URL de fallback local já é
+  // o valor padrão, então o comportamento é idêntico — a resolução apenas conclui depois.
+  AppConfig.loadDynamicBackendUrl();
+
   runApp(
     MultiProvider(
       providers: [

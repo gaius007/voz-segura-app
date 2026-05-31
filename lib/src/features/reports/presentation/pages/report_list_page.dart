@@ -82,14 +82,15 @@ class _ReportListPageState extends State<ReportListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final notifier = context.watch<ReportNotifier>();
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Relatos Seguros'),
       ),
-      body: Center(
+      // Consumer restrito ao corpo: o AppBar/Scaffold não reconstroem quando o
+      // ReportNotifier notifica (somente a lista é reconstruída).
+      body: Consumer<ReportNotifier>(
+        builder: (context, notifier, _) => Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 700),
           child: notifier.isLoading
@@ -157,6 +158,7 @@ class _ReportListPageState extends State<ReportListPage> {
                           },
                         ),
                 ),
+        ),
         ),
       ),
     );

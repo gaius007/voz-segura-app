@@ -104,7 +104,7 @@ class _LoginPageState extends State<LoginPage> {
               actions: [
                 TextButton(
                   onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
-                  child: Text(
+                  child: const Text(
                     'Cancelar',
                     style: TextStyle(color: AppColors.textLight),
                   ),

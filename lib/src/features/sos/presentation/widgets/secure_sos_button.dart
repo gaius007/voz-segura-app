@@ -49,7 +49,7 @@ class _SecureSOSButtonState extends State<SecureSOSButton> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final sos = context.watch<SOSNotifier>();
-    final buttonSize = 240.0;
+    const buttonSize = 240.0;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -59,6 +59,14 @@ class _SecureSOSButtonState extends State<SecureSOSButton> with SingleTickerProv
           onLongPressEnd: _onHoldEnd,
           child: AnimatedBuilder(
             animation: _controller,
+            // O botão interno não depende de _controller.value; é passado como `child`
+            // para ser construído uma única vez por build, e não a cada frame da animação.
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 500),
+              child: _isUnlocked
+                  ? _buildSOSReal(sos, buttonSize)
+                  : _buildTrava(buttonSize),
+            ),
             builder: (context, child) {
               double scale = 1.0 + (_controller.value * 0.05);
               return Transform.scale(
@@ -99,14 +107,9 @@ class _SecureSOSButtonState extends State<SecureSOSButton> with SingleTickerProv
                           ),
                         ),
                       ),
-                      
-                      // Inner Button
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 500),
-                        child: _isUnlocked
-                            ? _buildSOSReal(sos, buttonSize)
-                            : _buildTrava(buttonSize),
-                      ),
+
+                      // Inner Button (reutilizado a cada frame da animação)
+                      child!,
                     ],
                   ),
                 ),

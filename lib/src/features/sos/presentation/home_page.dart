@@ -24,6 +24,20 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   // Override local para quando não há internet e Firestore não sincroniza
   bool _localWhatsappConnected = false;
 
+  // Stream do documento do usuário mantido em cache para não re-assinar o Firestore
+  // a cada rebuild (ex.: quando o SOSNotifier notifica durante o envio).
+  Stream<DocumentSnapshot>? _userDocStream;
+  String? _streamUid;
+
+  Stream<DocumentSnapshot> _userDocStreamFor(String uid) {
+    if (_streamUid != uid || _userDocStream == null) {
+      _streamUid = uid;
+      _userDocStream =
+          FirebaseFirestore.instance.collection('users').doc(uid).snapshots();
+    }
+    return _userDocStream!;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -460,7 +474,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
     }
 
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
+      stream: _userDocStreamFor(user.uid),
       builder: (context, snapshot) {
         bool isConnected = _localWhatsappConnected;
         String phoneNumber = '';

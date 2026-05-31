@@ -11,8 +11,17 @@ import '../domain/contact.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 import 'package:voz_segura_app/src/core/widgets/confirm_dialog.dart';
 
-class EmergencyContactsPage extends StatelessWidget {
+class EmergencyContactsPage extends StatefulWidget {
   const EmergencyContactsPage({super.key});
+
+  @override
+  State<EmergencyContactsPage> createState() => _EmergencyContactsPageState();
+}
+
+class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
+  // Stream mantido em cache para não re-assinar o Firestore a cada rebuild do widget.
+  Stream<List<Contact>>? _contactsStream;
+  String? _cachedUid;
 
   void _showModal(BuildContext context, {Contact? contact}) {
     showModalBottomSheet(
@@ -38,6 +47,12 @@ class EmergencyContactsPage extends StatelessWidget {
     final watchContacts = context.read<WatchContacts>();
     final deleteContact = context.read<DeleteContact>();
 
+    // Cria o stream apenas quando o usuário muda; reusa a mesma assinatura nos demais builds.
+    if (user != null && _cachedUid != user.uid) {
+      _cachedUid = user.uid;
+      _contactsStream = watchContacts.execute(user.uid);
+    }
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -46,7 +61,7 @@ class EmergencyContactsPage extends StatelessWidget {
       body: user == null
           ? const Center(child: Text("Faça login primeiro!"))
           : StreamBuilder<List<Contact>>(
-              stream: watchContacts.execute(user.uid),
+              stream: _contactsStream,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());

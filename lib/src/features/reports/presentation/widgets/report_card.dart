@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../domain/entities/report.dart';
@@ -11,15 +12,24 @@ class ReportCard extends StatelessWidget {
 
   const ReportCard({super.key, required this.report});
 
+  // Formatter imutável criado uma única vez (evita realocar a cada build de card).
+  static final DateFormat _dateFormat = DateFormat('dd MMM, yyyy • HH:mm');
+
+  // Cache dos bytes já decodificados de base64, evitando decodificar a cada rebuild
+  // durante a rolagem da lista.
+  static final Map<String, Uint8List> _decodedCache = {};
+
   Widget _mostrarImagem(BuildContext context, String path, {required double size}) {
     if (path.startsWith('data:image')) {
       try {
-        final base64String = path.split(',').last;
+        final bytes = _decodedCache[path] ??= base64Url.decode(path.split(',').last);
         return Image.memory(
-          base64Url.decode(base64String),
+          bytes,
           width: size,
           height: size,
           fit: BoxFit.cover,
+          cacheWidth: (size * 2).round(),
+          cacheHeight: (size * 2).round(),
           errorBuilder: (ctx, error, stackTrace) => _buildPlaceholder(context, size),
         );
       } catch (e) {
@@ -31,6 +41,8 @@ class ReportCard extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.cover,
+        cacheWidth: (size * 2).round(),
+        cacheHeight: (size * 2).round(),
         errorBuilder: (ctx, error, stackTrace) => _buildPlaceholder(context, size),
       );
     }
@@ -47,7 +59,7 @@ class ReportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dataFormatada = DateFormat('dd MMM, yyyy • HH:mm').format(report.createdAt);
+    final dataFormatada = _dateFormat.format(report.createdAt);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),

@@ -22,15 +22,27 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
   // Cache de instâncias de imagens para evitar que as fotos pisquem a cada segundo durante os ticks do timer
   final Map<String, Widget> _imageWidgetCache = {};
 
+  // Formatter imutável criado uma única vez.
+  static final DateFormat _dateFormat = DateFormat('dd MMMM yyyy • HH:mm');
+
   @override
   void initState() {
     super.initState();
-    // Ticker a cada 1 segundo para atualizar o contador regressivo de 10 minutos na interface
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
+    // O texto regressivo de cada segundo é atualizado isoladamente pelo _CountdownText.
+    // Aqui mantemos um único timer apenas para reconstruir a página UMA vez, no exato
+    // momento em que o prazo de 10 min expira (alternando banners/botões). Após isso,
+    // ou se já estiver expirado, nenhum tick é necessário.
+    final remaining = 600 - DateTime.now().difference(widget.report.createdAt).inSeconds;
+    if (remaining > 0) {
+      _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) return;
+        final r = 600 - DateTime.now().difference(widget.report.createdAt).inSeconds;
+        if (r <= 0) {
+          timer.cancel();
+          setState(() {});
+        }
+      });
+    }
   }
 
   @override
@@ -38,13 +50,6 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     _countdownTimer?.cancel();
     _imageWidgetCache.clear();
     super.dispose();
-  }
-
-  String _formatDuration(int totalSeconds) {
-    if (totalSeconds <= 0) return '00:00';
-    final minutes = totalSeconds ~/ 60;
-    final seconds = totalSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   Widget _mostrarImagem(String path) {
@@ -400,7 +405,7 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     final authRepo = context.read<AuthRepository>();
     final currentUser = authRepo.currentUser;
 
-    final dataLegal = DateFormat('dd MMMM yyyy • HH:mm').format(currentReport.createdAt);
+    final dataLegal = _dateFormat.format(currentReport.createdAt);
     
     // Cálculo do tempo decorrido e elegibilidade de edição/deleção
     final timePassed = DateTime.now().difference(currentReport.createdAt);
@@ -471,8 +476,8 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  Text(
-                                    'Você pode alterar ou remover este relato nos próximos ${_formatDuration(remainingSeconds)}.',
+                                  _CountdownText(
+                                    createdAt: currentReport.createdAt,
                                     style: TextStyle(
                                       color: context.appTextMain,
                                       fontSize: 12,
@@ -807,6 +812,59 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Texto regressivo (MM:SS) que se atualiza a cada segundo de forma isolada,
+/// evitando reconstruir a página inteira de detalhes a cada tick.
+class _CountdownText extends StatefulWidget {
+  final DateTime createdAt;
+  final TextStyle style;
+
+  const _CountdownText({required this.createdAt, required this.style});
+
+  @override
+  State<_CountdownText> createState() => _CountdownTextState();
+}
+
+class _CountdownTextState extends State<_CountdownText> {
+  Timer? _timer;
+  late int _remaining;
+
+  int _compute() => 600 - DateTime.now().difference(widget.createdAt).inSeconds;
+
+  @override
+  void initState() {
+    super.initState();
+    _remaining = _compute();
+    if (_remaining > 0) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) return;
+        setState(() => _remaining = _compute());
+        if (_remaining <= 0) timer.cancel();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String _formatDuration(int totalSeconds) {
+    if (totalSeconds <= 0) return '00:00';
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Você pode alterar ou remover este relato nos próximos ${_formatDuration(_remaining)}.',
+      style: widget.style,
     );
   }
 }

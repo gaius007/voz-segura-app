@@ -22,6 +22,20 @@ class _SettingsPageState extends State<SettingsPage> {
   late TextEditingController _nameController;
   final EvolutionApiService _evolutionService = EvolutionApiService();
 
+  // Stream do documento do usuário em cache: evita re-assinar o Firestore a cada
+  // rebuild da página (ex.: ao trocar tema ou alternar camuflagem).
+  Stream<DocumentSnapshot>? _userDocStream;
+  String? _streamUid;
+
+  Stream<DocumentSnapshot> _userDocStreamFor(String uid) {
+    if (_streamUid != uid || _userDocStream == null) {
+      _streamUid = uid;
+      _userDocStream =
+          FirebaseFirestore.instance.collection('users').doc(uid).snapshots();
+    }
+    return _userDocStream!;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -51,8 +65,6 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget build(BuildContext context) {
     final authRepo = context.read<AuthRepository>();
     final user = authRepo.currentUser;
-    final camouNotifier = context.watch<CamouflageNotifier>();
-    final themeNotifier = context.watch<ThemeNotifier>();
 
     return Scaffold(
       backgroundColor: context.appScaffoldBg,
@@ -92,36 +104,40 @@ class _SettingsPageState extends State<SettingsPage> {
             // Seção de Aparência / Tema
             _buildSectionHeader('Aparência', Icons.palette_outlined),
             const SizedBox(height: 16),
-            _buildThemeSection(themeNotifier),
+            Consumer<ThemeNotifier>(
+              builder: (context, themeNotifier, _) => _buildThemeSection(themeNotifier),
+            ),
 
             const SizedBox(height: 32),
 
             // Seção de Segurança / Camuflagem
             _buildSectionHeader('Segurança e Camuflagem', Icons.security_outlined),
             const SizedBox(height: 16),
-            _buildInfoCard([
-              _buildSwitchRow(
-                'Modo Camuflagem',
-                'Disfarça o app como um portal de notícias. Para sair, segure a notícia com sua palavra-chave por 5 segundos.',
-                camouNotifier.isCamouflaged,
-                (val) {
-                  if (val && camouNotifier.showExplanation) {
-                    showDialog(
-                      context: context,
-                      builder: (_) => const CamouflageDialog(),
-                    );
-                  } else {
-                    camouNotifier.setCamouflaged(val);
-                  }
-                },
-              ),
-              const Divider(height: 24, color: AppColors.sakura),
-              _buildEditRow(
-                'Palavra-chave de saída',
-                camouNotifier.secretWord,
-                () => _showEditWordDialog(context, camouNotifier),
-              ),
-            ]),
+            Consumer<CamouflageNotifier>(
+              builder: (context, camouNotifier, _) => _buildInfoCard([
+                _buildSwitchRow(
+                  'Modo Camuflagem',
+                  'Disfarça o app como um portal de notícias. Para sair, segure a notícia com sua palavra-chave por 5 segundos.',
+                  camouNotifier.isCamouflaged,
+                  (val) {
+                    if (val && camouNotifier.showExplanation) {
+                      showDialog(
+                        context: context,
+                        builder: (_) => const CamouflageDialog(),
+                      );
+                    } else {
+                      camouNotifier.setCamouflaged(val);
+                    }
+                  },
+                ),
+                const Divider(height: 24, color: AppColors.sakura),
+                _buildEditRow(
+                  'Palavra-chave de saída',
+                  camouNotifier.secretWord,
+                  () => _showEditWordDialog(context, camouNotifier),
+                ),
+              ]),
+            ),
 
             const SizedBox(height: 32),
 
@@ -169,7 +185,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+      stream: _userDocStreamFor(uid),
       builder: (context, snapshot) {
         // Estado de carregamento
         if (snapshot.connectionState == ConnectionState.waiting) {

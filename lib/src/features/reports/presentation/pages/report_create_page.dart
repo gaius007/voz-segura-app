@@ -395,8 +395,8 @@ class _ReportCreatePageState extends State<ReportCreatePage> {
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(20),
                                       child: kIsWeb
-                                          ? Image.network(path, width: 120, height: 120, fit: BoxFit.cover)
-                                          : Image.file(io.File(path), width: 120, height: 120, fit: BoxFit.cover),
+                                          ? Image.network(path, width: 120, height: 120, fit: BoxFit.cover, cacheWidth: 240, cacheHeight: 240)
+                                          : Image.file(io.File(path), width: 120, height: 120, fit: BoxFit.cover, cacheWidth: 240, cacheHeight: 240),
                                     ),
                                   ),
                                 ),

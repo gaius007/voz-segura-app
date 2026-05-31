@@ -138,6 +138,7 @@ class _CamouflageViewState extends State<CamouflageView> {
                 height: 150,
                 width: double.infinity,
                 fit: BoxFit.cover,
+                cacheHeight: 300,
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
               const SizedBox(height: 12),
