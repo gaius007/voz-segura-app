@@ -25,11 +25,32 @@ class LocationServiceImpl implements LocationService {
       return Future.error('Permissão negada permanentemente.');
     }
 
-    return await Geolocator.getCurrentPosition();
+    // Em ambiente fechado o fix de GPS pode demorar indefinidamente — num SOS
+    // é melhor enviar a última posição conhecida do que travar sem enviar nada.
+    try {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+    } catch (_) {
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) return lastKnown;
+      return Future.error('Não foi possível obter a localização (GPS sem sinal).');
+    }
   }
 
   @override
   Future<void> openAppSettings() async {
     await Geolocator.openAppSettings();
+  }
+
+  @override
+  Stream<Position> getPositionStream() {
+    return Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
+    );
   }
 }

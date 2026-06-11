@@ -5,4 +5,7 @@ import 'package:geolocator/geolocator.dart';
 abstract class LocationService {
   Future<Position> getCurrentPosition();
   Future<void> openAppSettings();
+
+  // Stream contínuo de posições para acompanhar a localização em tempo real no mapa.
+  Stream<Position> getPositionStream();
 }

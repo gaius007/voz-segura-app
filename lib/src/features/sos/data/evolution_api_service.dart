@@ -20,6 +20,25 @@ class EvolutionApiService {
     }
   }
 
+  // Executa a requisicao e, se falhar por conexao (backend mudou de IP apos
+  // troca de rede, por exemplo), redescobre o backend e tenta UMA vez mais.
+  Future<http.Response> _requestWithRediscovery(
+    Future<http.Response> Function() request,
+  ) async {
+    if (AppConfig.evolutionBackendUrl.isEmpty) {
+      // Descoberta inicial ainda não concluiu (ou falhou no boot)
+      await AppConfig.rediscover();
+    }
+    try {
+      return await request();
+    } catch (e) {
+      debugPrint('EvolutionAPI: 🔄 Falha de conexão ($e), redescobrindo backend...');
+      final found = await AppConfig.rediscover();
+      if (!found) rethrow;
+      return await request();
+    }
+  }
+
   // Envia mensagem de WhatsApp silenciosa via backend proxy (Evolution API)
   // Retorna true se o envio foi bem-sucedido, false caso contrario
   Future<bool> sendWhatsAppMessage({
@@ -34,7 +53,7 @@ class EvolutionApiService {
 
     try {
       debugPrint('EvolutionAPI: Tentando disparo silencioso de WhatsApp...');
-      final response = await http.post(
+      final response = await _requestWithRediscovery(() => http.post(
         Uri.parse('${AppConfig.evolutionBackendUrl}/whatsapp/send'),
         headers: {
           'Content-Type': 'application/json',
@@ -44,7 +63,7 @@ class EvolutionApiService {
           'recipient': recipientPhone,
           'message': message,
         }),
-      ).timeout(AppConfig.silentSendTimeout);
+      ).timeout(AppConfig.silentSendTimeout));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint('EvolutionAPI: ✅ WhatsApp silencioso enviado com sucesso!');
@@ -67,12 +86,12 @@ class EvolutionApiService {
 
     try {
       debugPrint('EvolutionAPI: Solicitando QR Code para vinculação...');
-      final response = await http.get(
+      final response = await _requestWithRediscovery(() => http.get(
         Uri.parse('${AppConfig.evolutionBackendUrl}/whatsapp/connect?uid=$userId'),
         headers: {
           'Authorization': 'Bearer $token',
         },
-      ).timeout(AppConfig.qrCodeTimeout);
+      ).timeout(AppConfig.qrCodeTimeout));
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
@@ -96,12 +115,12 @@ class EvolutionApiService {
 
     try {
       debugPrint('EvolutionAPI: Solicitando Código de Pareamento (removeNinthDigit: $removeNinthDigit)...');
-      final response = await http.get(
+      final response = await _requestWithRediscovery(() => http.get(
         Uri.parse('${AppConfig.evolutionBackendUrl}/whatsapp/pairing-code?uid=$userId&removeNinthDigit=$removeNinthDigit'),
         headers: {
           'Authorization': 'Bearer $token',
         },
-      ).timeout(AppConfig.qrCodeTimeout);
+      ).timeout(AppConfig.qrCodeTimeout));
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
@@ -125,10 +144,10 @@ class EvolutionApiService {
 
     try {
       debugPrint('EvolutionAPI: Verificando status de conexão manualmente...');
-      final response = await http.get(
+      final response = await _requestWithRediscovery(() => http.get(
         Uri.parse('${AppConfig.evolutionBackendUrl}/whatsapp/status'),
         headers: {'Authorization': 'Bearer $token'},
-      ).timeout(AppConfig.silentSendTimeout);
+      ).timeout(AppConfig.silentSendTimeout));
 
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
@@ -149,14 +168,14 @@ class EvolutionApiService {
     if (token == null) return false;
 
     try {
-      final response = await http.post(
+      final response = await _requestWithRediscovery(() => http.post(
         Uri.parse('${AppConfig.evolutionBackendUrl}/whatsapp/disconnect'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
         body: jsonEncode({'uid': userId}),
-      ).timeout(AppConfig.silentSendTimeout);
+      ).timeout(AppConfig.silentSendTimeout));
 
       return response.statusCode == 200;
     } catch (e) {

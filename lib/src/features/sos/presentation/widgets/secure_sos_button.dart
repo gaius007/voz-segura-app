@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../sos_notifier.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
+import 'package:voz_segura_app/src/features/map/presentation/manager/panic_alert_notifier.dart';
 
 class SecureSOSButton extends StatefulWidget {
   const SecureSOSButton({super.key});
@@ -20,7 +21,7 @@ class _SecureSOSButtonState extends State<SecureSOSButton> with SingleTickerProv
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 5),
+      duration: const Duration(seconds: 3),
     )..addStatusListener((status) {
         if (status == AnimationStatus.completed) {
           setState(() => _isUnlocked = true);
@@ -153,6 +154,48 @@ class _SecureSOSButtonState extends State<SecureSOSButton> with SingleTickerProv
               ],
             ),
           ),
+
+        // Botão "Estou Segura" — aparece apenas quando há um alerta ativo no mapa.
+        Consumer<PanicAlertNotifier>(
+          builder: (context, panic, _) {
+            if (!panic.hasActiveAlert) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(top: 24),
+              child: ElevatedButton.icon(
+                onPressed: panic.isProcessing
+                    ? null
+                    : () async {
+                        await context.read<PanicAlertNotifier>().resolveAlert();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Situação marcada como resolvida.'),
+                              backgroundColor: AppColors.primary,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
+                icon: panic.isProcessing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.verified_user_rounded, color: Colors.white),
+                label: Text(
+                  panic.isProcessing ? 'Processando...' : 'Estou Segura / Situação Resolvida',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                ),
+              ),
+            );
+          },
+        ),
       ],
     );
   }
@@ -186,7 +229,13 @@ class _SecureSOSButtonState extends State<SecureSOSButton> with SingleTickerProv
       key: const ValueKey('sos'),
       color: Colors.transparent,
       child: InkWell(
-        onTap: sos.isSending ? null : () => sos.sendSOSAlert(context),
+        onTap: sos.isSending
+            ? null
+            : () {
+                // Notifica contatos (WhatsApp/SMS/e-mail) E registra o alerta no mapa.
+                sos.sendSOSAlert(context);
+                context.read<PanicAlertNotifier>().createAlert();
+              },
         borderRadius: BorderRadius.circular(size),
         child: Container(
           width: size * 0.8,

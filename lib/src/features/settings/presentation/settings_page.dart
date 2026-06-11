@@ -75,7 +75,8 @@ class _SettingsPageState extends State<SettingsPage> {
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        // Padding inferior maior para o botão "Sair" não ficar sob o menu de navegação.
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

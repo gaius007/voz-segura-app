@@ -534,7 +534,9 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                   Expanded(
                     child: Center(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
+                        // Padding inferior maior para o conteúdo (ex.: botão "Estou
+                        // Segura") não ficar sob o menu flutuante de navegação.
+                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 130),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
