@@ -26,6 +26,15 @@ import 'src/features/sos/data/repositories/sos_sender_repository_impl.dart';
 import 'src/features/sos/domain/repositories/sos_sender_repository.dart';
 import 'src/features/sos/domain/usecases/send_sos_alert.dart';
 import 'src/features/sos/presentation/sos_notifier.dart';
+import 'src/features/map/data/repositories/panic_alert_repository_impl.dart';
+import 'src/features/map/domain/repositories/panic_alert_repository.dart';
+import 'src/features/map/data/repositories/support_point_repository_impl.dart';
+import 'src/features/map/domain/repositories/support_point_repository.dart';
+import 'src/features/map/domain/usecases/create_panic_alert.dart';
+import 'src/features/map/domain/usecases/resolve_panic_alert.dart';
+import 'src/features/map/domain/usecases/watch_active_alerts.dart';
+import 'src/features/map/domain/usecases/get_support_points.dart';
+import 'src/features/map/presentation/manager/panic_alert_notifier.dart';
 import 'src/features/shared/navigation/main_navigation_page.dart';
 import 'src/core/theme/app_theme.dart';
 import 'src/core/theme/theme_notifier.dart';
@@ -78,6 +87,8 @@ class VozSeguraApp extends StatelessWidget {
         Provider<ContactRepository>(create: (_) => ContactRepositoryImpl()),
         Provider<LocationService>(create: (_) => LocationServiceImpl()),
         Provider<SosSenderRepository>(create: (_) => SosSenderRepositoryImpl()),
+        Provider<PanicAlertRepository>(create: (_) => PanicAlertRepositoryImpl()),
+        Provider<SupportPointRepository>(create: (_) => SupportPointRepositoryImpl()),
 
         ProxyProvider<ContactRepository, WatchContacts>(
           update: (_, repo, __) => WatchContacts(repo),
@@ -112,6 +123,19 @@ class VozSeguraApp extends StatelessWidget {
             sender: sender,
           ),
         ),
+
+        ProxyProvider<PanicAlertRepository, CreatePanicAlert>(
+          update: (_, repo, __) => CreatePanicAlert(repo),
+        ),
+        ProxyProvider<PanicAlertRepository, ResolvePanicAlert>(
+          update: (_, repo, __) => ResolvePanicAlert(repo),
+        ),
+        ProxyProvider<PanicAlertRepository, WatchActiveAlerts>(
+          update: (_, repo, __) => WatchActiveAlerts(repo),
+        ),
+        ProxyProvider<SupportPointRepository, GetSupportPoints>(
+          update: (_, repo, __) => GetSupportPoints(repo),
+        ),
         ChangeNotifierProvider<SOSNotifier>(
           create: (context) => SOSNotifier(
             sendSOSAlertUseCase: context.read<SendSOSAlert>(),
@@ -125,6 +149,15 @@ class VozSeguraApp extends StatelessWidget {
             getReportsUseCase: context.read<GetReports>(),
             updateReportUseCase: context.read<UpdateReport>(),
             deleteReportUseCase: context.read<DeleteReport>(),
+          ),
+        ),
+        ChangeNotifierProvider<PanicAlertNotifier>(
+          create: (context) => PanicAlertNotifier(
+            createPanicAlert: context.read<CreatePanicAlert>(),
+            resolvePanicAlert: context.read<ResolvePanicAlert>(),
+            watchActiveAlerts: context.read<WatchActiveAlerts>(),
+            locationService: context.read<LocationService>(),
+            authRepository: context.read<AuthRepository>(),
           ),
         ),
       ],
