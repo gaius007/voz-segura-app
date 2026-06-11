@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   evolution-db:
     image: postgres:15-alpine
@@ -21,7 +19,8 @@ services:
     restart: always
 
   evolution-api:
-    image: evoapicloud/evolution-api:latest
+    # Versão pinada: :latest pode trazer 2.4.0-rc com breaking changes
+    image: evoapicloud/evolution-api:v2.3.7
     container_name: evolution-api
     ports:
       - "8080:8080"
@@ -39,16 +38,44 @@ services:
       - CACHE_REDIS_PREFIX_KEY=evolution
       - CACHE_REDIS_TTL=604800
       - CACHE_REDIS_SAVE_INSTANCES=false
-      - STORE_MESSAGES=false
-      - STORE_CHATS=false
-      - STORE_CONTACTS=false
+      # Nomenclatura v2 (as antigas STORE_* eram v1 e são ignoradas)
+      - DATABASE_SAVE_DATA_CHATS=false
+      - DATABASE_SAVE_DATA_CONTACTS=false
+      - DATABASE_SAVE_DATA_HISTORIC=false
+      - DATABASE_SAVE_DATA_LABELS=false
       - CLEAN_CONNECTION=true
+      # Fingerprint realista do "dispositivo vinculado" — mitiga 401 no pareamento.
+      # NÃO setar CONFIG_SESSION_PHONE_VERSION: removida na v2.3.1 (versão WA Web é automática)
+      - CONFIG_SESSION_PHONE_CLIENT=Chrome
+      - CONFIG_SESSION_PHONE_NAME=Chrome
       - WEBHOOK_GLOBAL_ENABLED=true
-      - WEBHOOK_GLOBAL_URL=http://host.docker.internal:3000/api/whatsapp/webhook
-      - WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=true
+      - WEBHOOK_GLOBAL_URL=http://backend:3000/api/whatsapp/webhook
+      # byEvents=true postaria em subpaths (/connection-update) que o backend não roteia
+      - WEBHOOK_GLOBAL_WEBHOOK_BY_EVENTS=false
     depends_on:
       - evolution-db
       - evolution-redis
+    restart: always
+
+  backend:
+    build: ./backend
+    container_name: voz-segura-backend
+    # Docker Desktop roda containers numa VM: network_mode host não exporia a porta
+    # na LAN real. Com ports, o Desktop publica 3000 em todas as interfaces do notebook.
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/gcloud/adc.json
+      # Na rede do compose a Evolution é alcançada pelo nome do serviço
+      - EVOLUTION_API_URL=http://evolution-api:8080
+      # URL pela qual a Evolution (container vizinho) alcança este backend
+      - WEBHOOK_BASE_URL=http://backend:3000
+    volumes:
+      - ${HOME}/.config/gcloud/application_default_credentials.json:/gcloud/adc.json:ro
+    depends_on:
+      - evolution-api
     restart: always
 
 volumes:
