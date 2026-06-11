@@ -19,6 +19,32 @@ const isEvolutionConfigured = () => {
 const MOCK_QR_CODE_BASE64 = 
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH6AYbERQLDRt2JAAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLm4clQAAAJBJREFUaN7tmkEKwCAMBMe+/6fbQy+lhBKiux4EpYexm01mre257V3W2t4b/2oYcMQxV+Nq3C0a17g7jrnjsMa22KtxNq7G2bhbNK5x7+5w6fC5w6XD7+9wdziOueOwNuNo3C0a17h3d7h0+NzhcsOAI465GlfjbtG4xt1xzB2HNbYad2rcN36C1LgT8D22CjF3EAAAAABJRU5ErkJggg==';
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Configura o webhook da instância apontando de volta para este proxy.
+// byEvents DEVE ser false: com true a Evolution posta em subpaths (/connection-update)
+// que este router não atende — os eventos se perderiam em 404.
+async function configureInstanceWebhook(instanceName: string) {
+  const webhookBase = process.env.WEBHOOK_BASE_URL || `http://host.docker.internal:${process.env.PORT || 3000}`;
+  const webhookUrl = `${webhookBase}/api/whatsapp/webhook`;
+  await axios.post(
+    `${EVOLUTION_API_URL}/webhook/set/${instanceName}`,
+    {
+      webhook: {
+        enabled: true,
+        url: webhookUrl,
+        byEvents: false,
+        events: ['CONNECTION_UPDATE', 'QRCODE_UPDATED'],
+      },
+    },
+    {
+      headers: { apikey: EVOLUTION_API_KEY },
+      timeout: 4000,
+    }
+  );
+  console.log(`EvolutionProxy: Webhook configurado com sucesso para ${webhookUrl}`);
+}
+
 // 1. GET /connect - Cria instância e obtém o QR Code para pareamento
 router.get('/connect', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const uid = req.user?.uid;
@@ -60,23 +86,7 @@ router.get('/connect', requireAuth, async (req: AuthenticatedRequest, res: Respo
     // Passo B: Configura o Webhook da instância para apontar de volta para o nosso Proxy
     // Usa host.docker.internal (fixo) para que o container Evolution API sempre alcance o backend no host
     try {
-      const webhookUrl = `http://host.docker.internal:${process.env.PORT || 3000}/api/whatsapp/webhook`;
-      await axios.post(
-        `${EVOLUTION_API_URL}/webhook/set/${instanceName}`,
-        {
-          webhook: {
-            enabled: true,
-            url: webhookUrl,
-            byEvents: true,
-            events: ['CONNECTION_UPDATE', 'QRCODE_UPDATED'],
-          },
-        },
-        {
-          headers: { apikey: EVOLUTION_API_KEY },
-          timeout: 4000,
-        }
-      );
-      console.log(`EvolutionProxy: Webhook configurado com sucesso para ${webhookUrl}`);
+      await configureInstanceWebhook(instanceName);
     } catch (err: any) {
       console.warn(`EvolutionProxy: Falha ao configurar webhook da instância: ${err.message}`);
     }
@@ -87,20 +97,11 @@ router.get('/connect', requireAuth, async (req: AuthenticatedRequest, res: Respo
       timeout: 8000,
     });
 
-    // Mapeamento resiliente do QR Code da Evolution API v1/v2
+    // Somente os campos `base64` contêm a imagem do QR Code;
+    // `code` é a string raw do QR (formato "2@...") e não pode ser tratada como imagem
     let qrcodeBase64 = '';
     if (response.data) {
-      if (typeof response.data === 'string') {
-        qrcodeBase64 = response.data;
-      } else if (response.data.base64) {
-        qrcodeBase64 = response.data.base64;
-      } else if (response.data.code) {
-        qrcodeBase64 = response.data.code;
-      } else if (response.data.qrcode) {
-        qrcodeBase64 = typeof response.data.qrcode === 'string' 
-          ? response.data.qrcode 
-          : (response.data.qrcode.base64 || response.data.qrcode.code || '');
-      }
+      qrcodeBase64 = response.data.base64 || response.data.qrcode?.base64 || '';
     }
 
     if (!qrcodeBase64) {
@@ -114,8 +115,8 @@ router.get('/connect', requireAuth, async (req: AuthenticatedRequest, res: Respo
 
     return res.json({ qrcode: qrcodeBase64 });
   } catch (error: any) {
-    console.warn(`EvolutionProxy: ⚠️ Falha na chamada da Evolution API (${error.message}). Retornando QR Code demonstrativo (MOCK)...`);
-    return res.json({ qrcode: MOCK_QR_CODE_BASE64, mockMode: true });
+    console.error(`EvolutionProxy: ❌ Falha ao obter QR Code da Evolution API: ${error.message}`);
+    return res.status(502).json({ error: `Falha ao obter QR Code: ${error.message}` });
   }
 });
 
@@ -181,17 +182,14 @@ router.post('/send', requireAuth, async (req: AuthenticatedRequest, res: Respons
   try {
     // Formata o número limpando caracteres especiais
     let cleanNumber = recipient.replace(/\D/g, '');
-    
-    // endpoint de envio de texto no padrão Evolution API
+
+    // Payload achatado da Evolution API v2 (o formato v1 com options/textMessage retorna 400)
     const response = await axios.post(
       `${EVOLUTION_API_URL}/message/sendText/${instanceName}`,
       {
         number: cleanNumber,
-        options: {
-          delay: 1200,
-          presence: 'composing',
-        },
-        textMessage: { text: message },
+        text: message,
+        delay: 1200,
       },
       {
         headers: { apikey: EVOLUTION_API_KEY },
@@ -202,15 +200,18 @@ router.post('/send', requireAuth, async (req: AuthenticatedRequest, res: Respons
     console.log(`EvolutionProxy: ✅ SOS disparado com sucesso via Evolution API!`);
     return res.status(200).json({ success: true, data: response.data });
   } catch (error: any) {
-    console.warn(`EvolutionProxy: ⚠️ Falha no disparo automático silencioso (${error.message}). Ativando fallback e simulando sucesso (MOCK)...`);
-    console.log(`[FALLBACK WHATSAPP] De: ${instanceName} -> Para: ${recipient} | Emissores: ${message}`);
-    return res.status(200).json({ success: true, mockMode: true, fallback: true });
+    // Falha REAL deve chegar ao app para ativar os fallbacks (wa.me / SMS).
+    // Nunca simular sucesso aqui: em um SOS a mensagem simplesmente não seria enviada.
+    const detail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
+    console.error(`EvolutionProxy: ❌ Falha no disparo silencioso: ${detail}`);
+    return res.status(502).json({ success: false, error: `Falha no envio via Evolution API: ${detail}` });
   }
 });
 
 // 4. GET /pairing-code - Gera e retorna o código de 8 caracteres para vinculação fácil
-// Na Evolution API v2.3.7 o pairingCode vem diretamente na resposta do POST /instance/create
-// quando o campo `number` é informado junto com integration: 'WHATSAPP-BAILEYS'
+// Na Evolution API v2.3.x o pairingCode é gerado ASSINCRONAMENTE pelo Baileys (~1s após o
+// primeiro QR), então a resposta do POST /instance/create é apenas um fast path; o caminho
+// confiável é GET /instance/connect/{instance}?number=NNN com retry até o código aparecer.
 router.get('/pairing-code', requireAuth, async (req: AuthenticatedRequest, res: Response) => {
   const uid = req.user?.uid;
   if (!uid) return res.status(400).json({ error: 'User UID not found in session.' });
@@ -251,15 +252,16 @@ router.get('/pairing-code', requireAuth, async (req: AuthenticatedRequest, res: 
     }
 
     // Deleta instância anterior para garantir estado limpo e novo pairingCode
+    // (sessão em "close" com 401 não se recupera sozinha)
     try {
       await axios.delete(`${EVOLUTION_API_URL}/instance/delete/${instanceName}`, {
         headers: { apikey: EVOLUTION_API_KEY },
         timeout: 5000,
       });
       console.log(`EvolutionProxy: Instância anterior deletada.`);
+      await sleep(500);
     } catch (e) {}
 
-    // Cria instância passando o número — a Evolution API v2 retorna o pairingCode na própria resposta
     console.log(`EvolutionProxy: Criando instância ${instanceName} com número ${cleanNumber} para gerar pairingCode`);
     const createResponse = await axios.post(
       `${EVOLUTION_API_URL}/instance/create`,
@@ -278,27 +280,32 @@ router.get('/pairing-code', requireAuth, async (req: AuthenticatedRequest, res: 
 
     // Configura webhook para receber eventos de conexão
     try {
-      const webhookUrl = `http://host.docker.internal:${process.env.PORT || 3000}/api/whatsapp/webhook`;
-      await axios.post(
-        `${EVOLUTION_API_URL}/webhook/set/${instanceName}`,
-        {
-          webhook: {
-            enabled: true,
-            url: webhookUrl,
-            byEvents: true,
-            events: ['CONNECTION_UPDATE', 'QRCODE_UPDATED'],
-          },
-        },
-        { headers: { apikey: EVOLUTION_API_KEY }, timeout: 4000 }
-      );
-      console.log(`EvolutionProxy: Webhook configurado → ${webhookUrl}`);
+      await configureInstanceWebhook(instanceName);
     } catch (e: any) {
       console.warn(`EvolutionProxy: Webhook config falhou: ${e.message}`);
     }
 
-    const code = createResponse.data?.qrcode?.pairingCode || '';
+    // Fast path: às vezes o create já responde com o pairingCode
+    let code = createResponse.data?.qrcode?.pairingCode || '';
+
+    // Caminho principal: pede o código via /instance/connect com retry, já que o
+    // Baileys só o gera ~1s depois do handshake inicial
+    for (let attempt = 1; !code && attempt <= 5; attempt++) {
+      await sleep(2000);
+      try {
+        const connectResponse = await axios.get(
+          `${EVOLUTION_API_URL}/instance/connect/${instanceName}?number=${cleanNumber}`,
+          { headers: { apikey: EVOLUTION_API_KEY }, timeout: 8000 }
+        );
+        code = connectResponse.data?.pairingCode || connectResponse.data?.qrcode?.pairingCode || '';
+        console.log(`EvolutionProxy: Tentativa ${attempt}/5 de obter pairingCode → ${code || 'ainda não disponível'}`);
+      } catch (e: any) {
+        console.warn(`EvolutionProxy: Tentativa ${attempt}/5 falhou: ${e.message}`);
+      }
+    }
+
     if (!code) {
-      throw new Error('Nenhum pairingCode na resposta da Evolution API. Verifique se o número está correto.');
+      throw new Error('Pairing code não foi gerado pela Evolution API. Verifique se o número está correto (com DDI 55 e 9º dígito).');
     }
 
     console.log(`EvolutionProxy: ✅ Pairing Code gerado: ${code} para número ${cleanNumber}`);
@@ -342,7 +349,9 @@ router.get('/status', requireAuth, async (req: AuthenticatedRequest, res: Respon
   }
 });
 
-router.post('/webhook', async (req, res) => {
+// Aceita também subpaths (/webhook/connection-update) caso alguma instância
+// antiga ainda esteja configurada com byEvents=true
+router.post(['/webhook', '/webhook/:event'], async (req, res) => {
   const { event, instance, data } = req.body;
 
   if (!event || !instance) {
