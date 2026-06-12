@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -142,6 +143,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
             const SizedBox(height: 32),
 
+            // Seção de Privacidade (anonimato nos comentários)
+            _buildSectionHeader('Privacidade', Icons.visibility_off_outlined),
+            const SizedBox(height: 16),
+            _buildPrivacySection(user?.uid),
+
+            const SizedBox(height: 32),
+
             // Seção de Apoio e Denúncia
             _buildSectionHeader('Apoio e Denúncia', Icons.shield_outlined),
             const SizedBox(height: 16),
@@ -171,6 +179,51 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
       ),
+    );
+  }
+
+  // Preferência de anonimato nos comentários — vale para TODOS os comentários
+  // (antigos e novos), pois o nome é resolvido dinamicamente na leitura.
+  Widget _buildPrivacySection(String? uid) {
+    if (uid == null) {
+      return _buildInfoCard([
+        const Text(
+          'Faça login para gerenciar sua privacidade.',
+          style: TextStyle(color: AppColors.textLight),
+        ),
+      ]);
+    }
+
+    final profileRef =
+        FirebaseFirestore.instance.collection('public_profiles').doc(uid);
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: profileRef.snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data() as Map<String, dynamic>?;
+        final showName = data?['showNameInComments'] == true;
+
+        return _buildInfoCard([
+          _buildSwitchRow(
+            'Exibir meu nome nos comentários',
+            'Quando desligado, todos os seus comentários nos relatos aparecem como "Anônima". A mudança vale para comentários antigos e novos.',
+            showName,
+            (val) async {
+              // Sincroniza também o nome a partir do perfil privado (users/{uid})
+              final userDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(uid)
+                  .get();
+              final name = userDoc.data()?['name'] as String? ?? '';
+              await profileRef.set({
+                'name': name,
+                'showNameInComments': val,
+                'updatedAt': FieldValue.serverTimestamp(),
+              }, SetOptions(merge: true));
+            },
+          ),
+        ]);
+      },
     );
   }
 
@@ -342,8 +395,38 @@ class _SettingsPageState extends State<SettingsPage> {
     _showQRCodeDialog(context, uid);
   }
 
-  // Modal de QR Code para vinculacao do WhatsApp
+  // Modal de QR Code para vinculacao do WhatsApp.
+  // O polling detecta a conexao automaticamente e fecha o modal sozinho.
   void _showQRCodeDialog(BuildContext context, String uid) {
+    Timer? pollingTimer;
+    bool dialogOpen = true;
+
+    pollingTimer = Timer.periodic(const Duration(seconds: 5), (timer) async {
+      try {
+        final connected = await _evolutionService.checkConnectionStatus();
+        if (!connected) return;
+        timer.cancel();
+        pollingTimer = null;
+        // Sincroniza o status para a secao "Dispositivo de Emergencia" refletir na hora
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .update({'whatsappConnected': true});
+        if (context.mounted) {
+          if (dialogOpen) Navigator.of(context, rootNavigator: true).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('WhatsApp conectado com sucesso!'),
+              backgroundColor: AppColors.primary,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+      } catch (_) {
+        // falha silenciosa: sem rede momentanea, tenta no proximo tick
+      }
+    });
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -458,7 +541,11 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      dialogOpen = false;
+      pollingTimer?.cancel();
+      pollingTimer = null;
+    });
   }
 
   // Seção de canais de apoio: Disque 180 e localização da Delegacia da Mulher

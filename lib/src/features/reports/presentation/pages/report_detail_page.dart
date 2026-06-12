@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../domain/entities/report.dart';
+import 'package:voz_segura_app/src/core/security/local_auth_service.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 import 'package:voz_segura_app/src/features/auth/domain/auth_repository.dart';
 import '../manager/report_notifier.dart';
+import '../widgets/comments_section.dart';
 
 class ReportDetailPage extends StatefulWidget {
   final Report report;
@@ -87,7 +89,13 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     return imageWidget;
   }
 
-  void _mostrarDialogoEdicao(BuildContext context, Report currentReport) {
+  Future<void> _mostrarDialogoEdicao(BuildContext context, Report currentReport) async {
+    // Autenticação local (biometria/PIN) antes de ação sensível
+    final authenticated = await context
+        .read<LocalAuthService>()
+        .authenticate('Confirme sua identidade para editar o relato');
+    if (!authenticated || !context.mounted) return;
+
     final formKey = GlobalKey<FormState>();
     final descController = TextEditingController(text: currentReport.description);
     ReportVisibility tempVisibility = currentReport.visibility;
@@ -301,7 +309,13 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
     );
   }
 
-  void _mostrarConfirmacaoExclusao(BuildContext context, Report currentReport) {
+  Future<void> _mostrarConfirmacaoExclusao(BuildContext context, Report currentReport) async {
+    // Autenticação local (biometria/PIN) antes de ação sensível
+    final authenticated = await context
+        .read<LocalAuthService>()
+        .authenticate('Confirme sua identidade para excluir o relato');
+    if (!authenticated || !context.mounted) return;
+
     bool excluindo = false;
 
     showDialog(
@@ -806,6 +820,11 @@ class _ReportDetailPageState extends State<ReportDetailPage> {
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 40),
+
+                  // Comentários e respostas entre usuárias (anônimos por padrão)
+                  CommentsSection(reportId: currentReport.id),
                 ],
               ),
             ),

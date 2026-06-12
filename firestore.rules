@@ -19,11 +19,32 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Relatos/reports - qualquer usuario autenticado pode ler, apenas o autor pode escrever
+    // Relatos/reports - qualquer usuario autenticado pode ler, apenas a autora pode escrever
     match /reports/{reportId} {
       allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.authorId;
+      allow create: if request.auth != null && request.resource.data.authorUid == request.auth.uid;
+      allow update, delete: if request.auth != null && request.auth.uid == resource.data.authorUid;
+
+      // Comentarios dos relatos - anonimato resolvido na leitura via public_profiles
+      match /comments/{commentId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null
+            && request.resource.data.authorUid == request.auth.uid
+            && request.resource.data.text is string
+            && request.resource.data.text.size() <= 1000;
+        // Soft delete: a autora so pode alterar 'deleted' e 'text'
+        allow update: if request.auth != null
+            && request.auth.uid == resource.data.authorUid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleted', 'text']);
+        allow delete: if request.auth != null && request.auth.uid == resource.data.authorUid;
+      }
+    }
+
+    // Perfil publico minimo (nome + preferencia de anonimato em comentarios).
+    // Dados sensiveis (telefone, e-mail) continuam apenas em /users (privado).
+    match /public_profiles/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
     // Configurações globais - qualquer um pode ler (essencial para carregar a URL do proxy local), escrita bloqueada

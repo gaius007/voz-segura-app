@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:provider/provider.dart';
 import '../domain/auth_repository.dart';
+import 'register_success_page.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 
 // Tela pra criar conta no Firebase
@@ -71,7 +72,24 @@ class _RegisterPageState extends State<RegisterPage> {
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        if (mounted) Navigator.pop(context); // volta pro login se deu certo
+        // 4. Perfil publico minimo (nome + anonimato em comentarios, anonima por padrao)
+        await FirebaseFirestore.instance
+            .collection('public_profiles')
+            .doc(appUser.uid)
+            .set({
+          'name': _nameController.text.trim(),
+          'showNameInComments': false,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+
+        // O Firebase Auth ja logou a conta nova automaticamente (o AuthWrapper
+        // ja trocou a rota raiz para a home) — exibe a tela de sucesso por cima.
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const RegisterSuccessPage()),
+            (route) => route.isFirst,
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
