@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../manager/report_notifier.dart';
 import '../widgets/report_card.dart';
+import 'package:voz_segura_app/src/core/security/local_auth_service.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 import 'package:voz_segura_app/src/core/widgets/confirm_dialog.dart';
 
@@ -51,6 +52,13 @@ class _ReportListPageState extends State<ReportListPage> {
           'Você tem certeza de que deseja excluir permanentemente este relato? Essa ação não poderá ser desfeita.',
     );
     if (!confirmado) return false;
+    if (!context.mounted) return false;
+
+    // Autenticação local (biometria/PIN) antes de ação sensível
+    final authenticated = await context
+        .read<LocalAuthService>()
+        .authenticate('Confirme sua identidade para excluir o relato');
+    if (!authenticated || !context.mounted) return false;
 
     try {
       await context.read<ReportNotifier>().excluirRelato(reportId);

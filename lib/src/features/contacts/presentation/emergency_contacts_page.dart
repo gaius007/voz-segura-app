@@ -8,6 +8,7 @@ import '../domain/usecases/add_contact.dart';
 import '../domain/usecases/update_contact.dart';
 import '../domain/usecases/delete_contact.dart';
 import '../domain/contact.dart';
+import 'package:voz_segura_app/src/core/security/local_auth_service.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 import 'package:voz_segura_app/src/core/widgets/confirm_dialog.dart';
 
@@ -23,7 +24,15 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
   Stream<List<Contact>>? _contactsStream;
   String? _cachedUid;
 
-  void _showModal(BuildContext context, {Contact? contact}) {
+  Future<void> _showModal(BuildContext context, {Contact? contact}) async {
+    // Editar contato existente é ação sensível — exige biometria/PIN.
+    // Criar contato novo não exige.
+    if (contact != null) {
+      final authenticated = await context
+          .read<LocalAuthService>()
+          .authenticate('Confirme sua identidade para editar o contato');
+      if (!authenticated || !context.mounted) return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -32,13 +41,19 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
     );
   }
 
-  Future<bool> _confirmarExclusao(BuildContext context, Contact contact) {
-    return showConfirmDialog(
+  Future<bool> _confirmarExclusao(BuildContext context, Contact contact) async {
+    final confirmado = await showConfirmDialog(
       context,
       title: 'Excluir Contato',
       message:
           'Deseja remover "${contact.name}" da sua rede de apoio? Essa ação não poderá ser desfeita.',
     );
+    if (!confirmado || !context.mounted) return false;
+
+    // Autenticação local (biometria/PIN) antes de ação sensível
+    return context
+        .read<LocalAuthService>()
+        .authenticate('Confirme sua identidade para excluir o contato');
   }
 
   @override
@@ -180,11 +195,12 @@ class _ContactCard extends StatelessWidget {
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.appTextMain),
                       ),
                       const SizedBox(height: 4),
-                      ...contact.methods.map((m) => Padding(
+                      // E-mails antigos não são mais exibidos (canal descontinuado)
+                      ...contact.methods.where((m) => m.type != 'E-mail').map((m) => Padding(
                         padding: const EdgeInsets.only(bottom: 2),
                         child: Row(
                           children: [
-                            Icon(_getIconForType(m.type), size: 14, color: context.appPrimary),
+                            Icon(Icons.message_rounded, size: 14, color: context.appPrimary),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
@@ -219,14 +235,6 @@ class _ContactCard extends StatelessWidget {
     );
   }
 
-  IconData _getIconForType(String type) {
-    switch (type) {
-      case 'WhatsApp': return Icons.message_rounded;
-      case 'Telefone': return Icons.phone_rounded;
-      case 'E-mail': return Icons.email_rounded;
-      default: return Icons.contact_page_rounded;
-    }
-  }
 }
 
 class ContactForm extends StatefulWidget {
@@ -253,12 +261,15 @@ class _ContactFormState extends State<ContactForm> {
     super.initState();
     _nameController = TextEditingController(text: widget.contact?.name ?? '');
     if (widget.contact != null) {
-      for (var m in widget.contact!.methods) {
+      // E-mails foram descontinuados: somem na próxima edição (migração preguiçosa).
+      // Números antigos do tipo 'Telefone' são mantidos como WhatsApp.
+      for (var m in widget.contact!.methods.where((m) => m.type != 'E-mail')) {
         _methodEntries.add(_MethodEntry(
           controller: TextEditingController(text: m.value),
-          type: m.type,
+          type: 'WhatsApp',
         ));
       }
+      if (_methodEntries.isEmpty) _addMethod();
     } else {
       _addMethod();
     }
@@ -364,7 +375,7 @@ class _ContactFormState extends State<ContactForm> {
                 const SizedBox(height: 24),
                 Row(
                   children: [
-                    Text("MEIOS DE CONTATO", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.appTextLight, letterSpacing: 1.1)),
+                    Text("NÚMEROS DE WHATSAPP", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.appTextLight, letterSpacing: 1.1)),
                     const Spacer(),
                     IconButton(
                       onPressed: _salvando ? null : _addMethod,
@@ -381,26 +392,15 @@ class _ContactFormState extends State<ContactForm> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          flex: 2,
-                          child: DropdownButtonFormField<String>(
-                            value: entry.type,
-                            dropdownColor: context.appCardColor,
-                            items: ['WhatsApp', 'Telefone', 'E-mail'].map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 14)))).toList(),
-                            onChanged: _salvando ? null : (v) => setState(() => entry.type = v!),
-                            decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12)),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 3,
                           child: TextFormField(
                             controller: entry.controller,
                             enabled: !_salvando,
-                            inputFormatters: (entry.type != 'E-mail') ? [_maskCelular] : [],
-                            keyboardType: entry.type == 'E-mail' ? TextInputType.emailAddress : TextInputType.phone,
-                            decoration: InputDecoration(
-                              hintText: entry.type == 'E-mail' ? "email@exemplo.com" : "(00) 00000-0000",
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                            inputFormatters: [_maskCelular],
+                            keyboardType: TextInputType.phone,
+                            decoration: const InputDecoration(
+                              hintText: "(00) 00000-0000",
+                              prefixIcon: Icon(Icons.message_rounded, size: 20),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12),
                             ),
                             validator: (v) => v!.isEmpty ? "Vazio" : null,
                           ),
