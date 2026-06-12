@@ -45,6 +45,25 @@ class LocationServiceImpl implements LocationService {
   }
 
   @override
+  Future<LocationPermission> checkPermission() {
+    return Geolocator.checkPermission();
+  }
+
+  @override
+  Future<LocationPermission> requestPermission() {
+    return Geolocator.requestPermission();
+  }
+
+  @override
+  Future<Position?> getLastKnownPosition() async {
+    try {
+      return await Geolocator.getLastKnownPosition();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
   Stream<Position> getPositionStream() {
     return Geolocator.getPositionStream(
       locationSettings: const LocationSettings(

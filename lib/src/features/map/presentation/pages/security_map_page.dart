@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
 import '../../../sos/domain/services/location_service.dart';
@@ -25,13 +26,18 @@ class SecurityMapPage extends StatefulWidget {
 
 class _SecurityMapPageState extends State<SecurityMapPage> {
   static const LatLng _fallbackCenter = LatLng(-23.5505, -46.6333); // São Paulo
+  static const String _lastCenterKey = 'map_last_center';
 
   final MapController _mapController = MapController();
   StreamSubscription<Position>? _positionSub;
 
+  // Centro inicial resolvido SINCRONAMENTE (cache da última sessão) para o mapa
+  // renderizar de imediato; o fix real do GPS refina via move() quando chegar.
+  late LatLng _initialCenter;
   LatLng? _currentLatLng;
+  LatLng? _poiCenter; // centro para o qual os POIs já foram carregados
+  DateTime? _lastCenterSave;
   List<SupportPoint> _supportPoints = [];
-  bool _loadingLocation = true;
   bool _loadingPoints = false;
   bool _mapReady = false;
   String? _locationError;
@@ -39,46 +45,88 @@ class _SecurityMapPageState extends State<SecurityMapPage> {
   @override
   void initState() {
     super.initState();
+    _initialCenter = _readCachedCenter() ?? _fallbackCenter;
     _init();
+  }
+
+  LatLng? _readCachedCenter() {
+    try {
+      final raw = context.read<SharedPreferences>().getString(_lastCenterKey);
+      if (raw == null) return null;
+      final parts = raw.split(',');
+      return LatLng(double.parse(parts[0]), double.parse(parts[1]));
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _init() async {
     final locationService = context.read<LocationService>();
+
+    // POIs da região conhecida carregam já, sem esperar o GPS
+    if (_readCachedCenter() != null) {
+      _maybeLoadPoints(_initialCenter);
+    }
+
+    // Última posição conhecida chega em milissegundos — refina o centro
+    locationService.getLastKnownPosition().then((pos) {
+      if (pos != null) _applyPosition(LatLng(pos.latitude, pos.longitude));
+    });
+
+    // Stream em tempo real desde já
+    _subscribeToPosition(locationService);
+
+    // Fix real do GPS (pode demorar até 10s) — em paralelo, sem bloquear nada
     try {
       final pos = await locationService.getCurrentPosition();
       _applyPosition(LatLng(pos.latitude, pos.longitude));
-      _subscribeToPosition(locationService);
     } catch (e) {
-      // Mesmo que a leitura pontual falhe/expire, o stream costuma funcionar —
-      // e ao emitir uma posição ele limpa o erro automaticamente.
-      _subscribeToPosition(locationService);
       if (!mounted) return;
-      setState(() {
-        _loadingLocation = false;
-        if (_currentLatLng == null) {
+      if (_currentLatLng == null) {
+        setState(() {
           _locationError = e.toString().contains('negada')
               ? 'Permissão de localização negada. Ative o GPS para ver o mapa centrado em você.'
               : 'Não foi possível obter sua localização.';
-        }
-      });
+        });
+      }
     }
   }
 
-  /// Aplica uma nova posição. No primeiro fix o mapa já centraliza via
-  /// `initialCenter`; só chamamos `move()` quando o mapa já está renderizado
-  /// (evita exceção por mover antes do FlutterMap existir na árvore).
+  /// Aplica uma nova posição real: marca a usuária, move o mapa no primeiro fix,
+  /// carrega/atualiza POIs e persiste o centro para a próxima sessão.
   void _applyPosition(LatLng latLng) {
     if (!mounted) return;
     final firstFix = _currentLatLng == null;
     setState(() {
       _currentLatLng = latLng;
-      _loadingLocation = false;
       _locationError = null; // qualquer posição obtida limpa o erro
     });
-    if (firstFix) {
-      _loadSupportPoints(latLng);
-      if (_mapReady) _mapController.move(latLng, 15);
+    if (firstFix && _mapReady) _mapController.move(latLng, 15);
+    _maybeLoadPoints(latLng);
+    _persistCenter(latLng);
+  }
+
+  // Carrega POIs apenas quando ainda não há, ou quando o centro mudou >2km
+  void _maybeLoadPoints(LatLng center) {
+    if (_poiCenter != null) {
+      final meters = const Distance().as(LengthUnit.Meter, _poiCenter!, center);
+      if (meters < 2000) return;
     }
+    _poiCenter = center;
+    _loadSupportPoints(center);
+  }
+
+  // Grava o centro com throttle de 30s para não spammar o SharedPreferences
+  void _persistCenter(LatLng latLng) {
+    final now = DateTime.now();
+    if (_lastCenterSave != null &&
+        now.difference(_lastCenterSave!) < const Duration(seconds: 30)) {
+      return;
+    }
+    _lastCenterSave = now;
+    context
+        .read<SharedPreferences>()
+        .setString(_lastCenterKey, '${latLng.latitude},${latLng.longitude}');
   }
 
   void _subscribeToPosition(LocationService locationService) {
@@ -129,14 +177,14 @@ class _SecurityMapPageState extends State<SecurityMapPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: _loadingLocation
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
+      // O mapa renderiza imediatamente com o último centro conhecido;
+      // o fix do GPS apenas refina a posição quando chegar.
+      body: Stack(
               children: [
                 FlutterMap(
                   mapController: _mapController,
                   options: MapOptions(
-                    initialCenter: _currentLatLng ?? _fallbackCenter,
+                    initialCenter: _currentLatLng ?? _initialCenter,
                     initialZoom: 15,
                     minZoom: 3,
                     maxZoom: 18,
@@ -251,12 +299,16 @@ class _SecurityMapPageState extends State<SecurityMapPage> {
     switch (type) {
       case SupportPointType.delegacia:
         return (Icons.local_police_rounded, Colors.indigo);
+      case SupportPointType.delegaciaMulher:
+        return (Icons.local_police_rounded, AppColors.primary);
       case SupportPointType.postoPM:
         return (Icons.shield_rounded, Colors.blue);
       case SupportPointType.hospital:
         return (Icons.local_hospital_rounded, Colors.red);
       case SupportPointType.centroApoio:
         return (Icons.volunteer_activism_rounded, Colors.teal);
+      case SupportPointType.casaAcolhimento:
+        return (Icons.night_shelter_rounded, Colors.deepPurple);
       case SupportPointType.outro:
         return (Icons.place_rounded, Colors.grey);
     }
@@ -518,9 +570,11 @@ class _SecurityMapPageState extends State<SecurityMapPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          item(Icons.local_police_rounded, AppColors.primary, 'Delegacia da Mulher'),
           item(Icons.local_police_rounded, Colors.indigo, 'Delegacia / Polícia'),
           item(Icons.local_hospital_rounded, Colors.red, 'Hospital'),
           item(Icons.volunteer_activism_rounded, Colors.teal, 'Centro de Apoio'),
+          item(Icons.night_shelter_rounded, Colors.deepPurple, 'Casa de Acolhimento'),
           item(Icons.warning_amber_rounded, AppColors.ruby, 'Usuária em perigo'),
         ],
       ),

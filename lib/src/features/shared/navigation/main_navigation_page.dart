@@ -1,12 +1,17 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../reports/presentation/pages/report_list_page.dart';
 import '../../reports/presentation/pages/report_create_page.dart';
 import '../../sos/presentation/home_page.dart';
+import '../../sos/domain/services/location_service.dart';
 import '../../contacts/presentation/emergency_contacts_page.dart';
 import '../../settings/presentation/settings_page.dart';
 import '../../map/presentation/pages/security_map_page.dart';
 import 'package:voz_segura_app/src/core/theme/app_theme.dart';
+import 'package:voz_segura_app/src/core/widgets/location_permission_dialog.dart';
 
 class MainNavigationPage extends StatefulWidget {
   const MainNavigationPage({super.key});
@@ -18,6 +23,9 @@ class MainNavigationPage extends StatefulWidget {
 class _MainNavigationPageState extends State<MainNavigationPage> {
   int _indice = 0;
 
+  static const _rationaleShownKey = 'loc_perm_rationale_shown';
+  static const _settingsDialogShownKey = 'loc_perm_settings_dialog_shown';
+
   final List<Widget> _telas = [
     const HomePage(),
     const ReportListPage(),
@@ -25,6 +33,86 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
     const SecurityMapPage(),
     const SettingsPage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Pede a permissão de localização logo após o login, para que o SOS
+    // não dependa de prompts de permissão na hora da emergência.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _requestLocationOnce());
+  }
+
+  Future<void> _requestLocationOnce() async {
+    final locationService = context.read<LocationService>();
+    final prefs = await SharedPreferences.getInstance();
+
+    final status = await locationService.checkPermission();
+    if (status == LocationPermission.always ||
+        status == LocationPermission.whileInUse) {
+      return;
+    }
+
+    if (!mounted) return;
+
+    if (status == LocationPermission.deniedForever) {
+      // Não importunar a cada abertura — mostra o caminho das configurações 1x
+      if (prefs.getBool(_settingsDialogShownKey) == true) return;
+      await prefs.setBool(_settingsDialogShownKey, true);
+      showLocationPermissionDeniedDialog(context, locationService);
+      return;
+    }
+
+    // status == denied: racional antes do prompt do sistema, 1x por instalação
+    if (prefs.getBool(_rationaleShownKey) == true) return;
+
+    final accepted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.my_location_rounded, color: AppColors.primary, size: 26),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Permitir localização',
+                style: TextStyle(
+                  color: AppColors.textMain,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          'Sua localização é usada apenas para enviar sua posição à sua rede de apoio durante um SOS e para mostrar pontos de ajuda próximos no mapa.\n\nPermitir agora garante que o socorro seja imediato numa emergência.',
+          style: TextStyle(color: AppColors.textMain, fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Agora não', style: TextStyle(color: AppColors.rose)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Permitir', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    await prefs.setBool(_rationaleShownKey, true);
+    if (accepted == true) {
+      await locationService.requestPermission();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

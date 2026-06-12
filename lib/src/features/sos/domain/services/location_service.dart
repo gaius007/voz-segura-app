@@ -8,4 +8,12 @@ abstract class LocationService {
 
   // Stream contínuo de posições para acompanhar a localização em tempo real no mapa.
   Stream<Position> getPositionStream();
+
+  // Estado e solicitação de permissão — usados no onboarding pós-login,
+  // para que o SOS não dependa de prompts na hora da emergência.
+  Future<LocationPermission> checkPermission();
+  Future<LocationPermission> requestPermission();
+
+  // Última posição conhecida (rápida, sem esperar fix de GPS); null se nunca houve.
+  Future<Position?> getLastKnownPosition();
 }
