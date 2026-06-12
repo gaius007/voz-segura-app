@@ -54,24 +54,18 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
   }
 
   // Abre modal premium contendo o código de 8 caracteres para vincular o WhatsApp sem precisar escanear QR Code
-  // Agora com suporte dinâmico a alternar entre com/sem 9º dígito brasileiro
   void _showPairingCodeDialog(BuildContext context, String uid, String phoneNumber) {
     final evolutionService = EvolutionApiService();
-    bool removeNinthDigit = false;
     Timer? pollingTimer;
-    
+
     // Formata o número visualmente para exibição no modal
-    String formatDisplayNumber(String numStr, bool stripNine) {
+    String formatDisplayNumber(String numStr) {
       String clean = numStr.replaceAll(RegExp(r'\D'), '');
       if (!clean.startsWith('55') || clean.length < 4) return numStr;
-      
+
       String ddd = clean.substring(2, 4);
       String rest = clean.substring(4);
-      
-      if (stripNine && rest.startsWith('9') && rest.length > 8) {
-        rest = rest.substring(1);
-      }
-      
+
       if (rest.length == 9) {
         return '+55 ($ddd) ${rest.substring(0, 5)}-${rest.substring(5)}';
       } else if (rest.length == 8) {
@@ -84,10 +78,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
       context: context,
       barrierDismissible: false,
       builder: (dialogCtx) {
-        // Usamos StatefulBuilder para gerenciar o estado da alternância interna do modal
+        // StatefulBuilder permite o botão "Tentar Novamente" refazer o Future
         return StatefulBuilder(
           builder: (context, setModalState) {
-            final String currentDisplayNum = formatDisplayNumber(phoneNumber, removeNinthDigit);
+            final String currentDisplayNum = formatDisplayNumber(phoneNumber);
             
             return AlertDialog(
               backgroundColor: Colors.white,
@@ -112,8 +106,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 ],
               ),
               content: FutureBuilder<String?>(
-                // Passa o parâmetro removeNinthDigit dinamicamente com base no estado do Switch
-                future: evolutionService.fetchPairingCode(uid, removeNinthDigit: removeNinthDigit),
+                future: evolutionService.fetchPairingCode(uid),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return SizedBox(
@@ -157,7 +150,7 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                             ),
                             const SizedBox(height: 8),
                             const Text(
-                              'Verifique a rede ou tente mudar a opção do 9º dígito abaixo.',
+                              'Verifique sua conexão com a rede e tente novamente.',
                               style: TextStyle(color: AppColors.textLight, fontSize: 12),
                               textAlign: TextAlign.center,
                             ),
@@ -242,48 +235,6 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                                     color: AppColors.textMain,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        
-                        // Opção de remover 9º dígito
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.rose.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.sakura.withValues(alpha: 0.3)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Expanded(
-                                    child: Text(
-                                      'Remover o 9º dígito',
-                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textMain),
-                                    ),
-                                  ),
-                                  Switch(
-                                    value: removeNinthDigit,
-                                    activeColor: AppColors.ruby,
-                                    onChanged: (val) {
-                                      pollingTimer?.cancel();
-                                      pollingTimer = null;
-                                      setModalState(() {
-                                        removeNinthDigit = val;
-                                      });
-                                    },
-                                  ),
-                                ],
-                              ),
-                              const Text(
-                                '💡 Dica: Se no WhatsApp der o erro "Couldn\'t link device", ative esta opção acima e tente o novo código gerado.',
-                                style: TextStyle(fontSize: 10, color: AppColors.rose, height: 1.3),
                               ),
                             ],
                           ),
@@ -377,25 +328,10 @@ class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin
                 },
               ),
               actions: [
+                // A conexão é detectada automaticamente pelo polling — sem confirmação manual
                 TextButton(
                   onPressed: () => Navigator.pop(dialogCtx),
                   child: const Text('Fechar', style: TextStyle(color: AppColors.rose, fontWeight: FontWeight.bold)),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    Navigator.pop(dialogCtx);
-                    final connected = await evolutionService.checkConnectionStatus();
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(connected
-                            ? '✅ WhatsApp conectado com sucesso!'
-                            : 'Ainda não conectado. Tente inserir o código no WhatsApp primeiro.'),
-                        backgroundColor: connected ? AppColors.primary : AppColors.ruby,
-                      ),
-                    );
-                  },
-                  child: const Text('Já conectei', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
                 ),
               ],
             );

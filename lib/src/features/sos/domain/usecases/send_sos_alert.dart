@@ -25,16 +25,14 @@ class SendSOSAlert {
     final contacts = await contactRepository.watchContacts(userId).first;
     if (contacts.isEmpty) return false;
 
-    // Dispara SMS, WhatsApp e E-mails de forma assíncrona concorrente (paralela)
+    // Dispara WhatsApp para todos os contatos em paralelo.
+    // Métodos antigos do tipo 'Telefone' guardam o mesmo celular BR e são
+    // tratados como WhatsApp; 'E-mail' foi descontinuado e é ignorado.
     final List<Future<void>> sendFutures = [];
     for (var contact in contacts) {
       for (var method in contact.methods) {
-        if (method.type == 'WhatsApp') {
+        if (method.type == 'WhatsApp' || method.type == 'Telefone') {
           sendFutures.add(sender.sendWhatsApp(method.value, mapLink));
-        } else if (method.type == 'Telefone') {
-          sendFutures.add(sender.sendSMS(method.value, mapLink));
-        } else if (method.type == 'E-mail') {
-          sendFutures.add(sender.sendEmail(method.value, mapLink));
         }
       }
     }

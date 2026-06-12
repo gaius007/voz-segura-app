@@ -109,14 +109,14 @@ class EvolutionApiService {
 
   // Solicita o Código de Pareamento de 8 caracteres ao backend proxy
   // Retorna a string do código de pareamento (ex: "ABCD-EFGH"), ou null em caso de erro
-  Future<String?> fetchPairingCode(String userId, {bool removeNinthDigit = false}) async {
+  Future<String?> fetchPairingCode(String userId) async {
     final token = await _getAuthToken();
     if (token == null) return null;
 
     try {
-      debugPrint('EvolutionAPI: Solicitando Código de Pareamento (removeNinthDigit: $removeNinthDigit)...');
+      debugPrint('EvolutionAPI: Solicitando Código de Pareamento...');
       final response = await _requestWithRediscovery(() => http.get(
-        Uri.parse('${AppConfig.evolutionBackendUrl}/whatsapp/pairing-code?uid=$userId&removeNinthDigit=$removeNinthDigit'),
+        Uri.parse('${AppConfig.evolutionBackendUrl}/whatsapp/pairing-code?uid=$userId'),
         headers: {
           'Authorization': 'Bearer $token',
         },
